@@ -1,0 +1,106 @@
+<div class="page-wrapper">
+  <div class="page-header">
+    <div class="page-header-left">
+      <h2><i class="fas fa-coins"></i> Commissions & Paiements</h2>
+      <p class="page-subtitle">Suivez et validez les commissions des affiliés</p>
+    </div>
+    <div class="page-header-right">
+      <button class="btn btn-outline" (click)="load()"><i class="fas fa-sync-alt"></i> Actualiser</button>
+    </div>
+  </div>
+
+  <div class="alert alert-success" *ngIf="successMessage" (click)="clearMessages()">
+    <i class="fas fa-check-circle"></i> {{ successMessage }}
+  </div>
+  <div class="alert alert-danger" *ngIf="errorMessage" (click)="clearMessages()">
+    <i class="fas fa-exclamation-circle"></i> {{ errorMessage }}
+  </div>
+
+  <!-- KPIs -->
+  <div class="kpi-grid" *ngIf="!loading">
+    <div class="kpi-card">
+      <div class="kpi-icon kpi-blue"><i class="fas fa-coins"></i></div>
+      <div class="kpi-value" style="font-size:1.5rem;">{{ fmt(totalRevenue) }}</div>
+      <p class="kpi-label">Total commissions</p>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon kpi-green"><i class="fas fa-check-circle"></i></div>
+      <div class="kpi-value" style="font-size:1.5rem;">{{ fmt(totalPaid) }}</div>
+      <p class="kpi-label">Payées</p>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon kpi-orange"><i class="fas fa-clock"></i></div>
+      <div class="kpi-value" style="font-size:1.5rem;">{{ fmt(totalPending) }}</div>
+      <p class="kpi-label">En attente de paiement</p>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon kpi-purple"><i class="fas fa-receipt"></i></div>
+      <div class="kpi-value">{{ transactions.length }}</div>
+      <p class="kpi-label">Transactions</p>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="filter-bar">
+    <input type="text" placeholder="Rechercher affilié ou bien…" [(ngModel)]="searchTerm" (input)="applyFilters()" class="form-control" style="max-width:260px">
+    <select [(ngModel)]="paidFilter" (change)="applyFilters()">
+      <option value="">Tous</option>
+      <option value="paid">Payées</option>
+      <option value="unpaid">Non payées</option>
+    </select>
+  </div>
+
+  <div class="loading-state" *ngIf="loading"><i class="fas fa-spinner fa-spin"></i><span>Chargement…</span></div>
+  <div class="empty-state" *ngIf="!loading && filtered.length === 0">
+    <i class="fas fa-file-invoice-dollar fa-3x"></i>
+    <h3>Aucune transaction</h3>
+    <p>Les commissions apparaissent après l'acceptation d'offres de vente.</p>
+  </div>
+
+  <div class="table-card" *ngIf="!loading && filtered.length > 0">
+    <div class="table-header">
+      <h3><i class="fas fa-list"></i> {{ filtered.length }} transaction{{ filtered.length > 1 ? 's' : '' }}</h3>
+    </div>
+    <div class="offers-wrapper">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Affilié</th>
+            <th>Bien</th>
+            <th>Acheteur</th>
+            <th>Prix de vente</th>
+            <th>Taux</th>
+            <th>Commission</th>
+            <th>Statut</th>
+            <th>Date</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let t of filtered">
+            <td style="font-weight:600;font-size:0.875rem;">{{ t.affiliateName }}</td>
+            <td style="font-size:0.8125rem;color:var(--text-secondary);">{{ t.propertyTitle }}</td>
+            <td style="font-size:0.8125rem;">
+              {{ t.buyerName || t.clientEmail || '—' }}
+              <span *ngIf="t.viaAffiliate" class="via-affiliate-badge">Via affilié</span>
+            </td>
+            <td style="font-size:0.875rem;">{{ fmt(t.propertyPrice) }}</td>
+            <td style="font-size:0.875rem;">{{ t.commissionPercentage }}%</td>
+            <td style="font-weight:700;color:var(--primary);">{{ fmt(t.commissionAmount) }}</td>
+            <td>
+              <span class="paid-badge" *ngIf="t.isPaid"><i class="fas fa-check"></i> Payée</span>
+              <span class="unpaid-badge" *ngIf="!t.isPaid"><i class="fas fa-clock"></i> En attente</span>
+            </td>
+            <td style="font-size:0.8125rem;color:var(--text-muted);">{{ formatDate(t.transactionDate) }}</td>
+            <td>
+              <button class="btn btn-success btn-sm" *ngIf="!t.isPaid" (click)="markPaid(t)" [disabled]="actionLoading">
+                <i class="fas fa-check"></i> Marquer payée
+              </button>
+              <span *ngIf="t.isPaid" style="font-size:0.775rem;color:var(--text-muted);">{{ formatDate(t.paymentDate || '') }}</span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>

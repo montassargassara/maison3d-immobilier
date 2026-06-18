@@ -1,0 +1,180 @@
+<div class="gs-modal-backdrop" (click)="close()"></div>
+
+<div class="gs-modal">
+  <!-- Header -->
+  <div class="gs-modal-header">
+    <div class="gs-modal-title">
+      <i class="fas fa-atom"></i>
+      <span>Gaussian Splatting 3D</span>
+    </div>
+    <button class="gs-close-btn" (click)="close()"><i class="fas fa-times"></i></button>
+  </div>
+
+  <!-- Body -->
+  <div class="gs-modal-body">
+
+    <!-- IDLE: file upload -->
+    <ng-container *ngIf="state === 'idle'">
+      <p class="gs-subtitle">
+        Générez une scène 3D interactive à partir d'une vidéo grâce à la technologie
+        <strong>Gaussian Splatting</strong>.
+      </p>
+
+      <!-- Drop zone -->
+      <div class="gs-drop-zone"
+           [class.drag-over]="isDragOver"
+           [class.has-file]="selectedFile"
+           (dragover)="onDragOver($event)"
+           (dragleave)="onDragLeave($event)"
+           (drop)="onDrop($event)">
+
+        <ng-container *ngIf="!selectedFile">
+          <i class="fas fa-film gs-drop-icon"></i>
+          <p>Glissez une vidéo ici ou <label class="gs-file-link" for="gsFileInput">parcourez</label></p>
+          <small>MP4, MOV, AVI, MKV, WebM · max 1 Go</small>
+          <input id="gsFileInput" type="file" accept="video/*" hidden (change)="onFileSelected($event)">
+        </ng-container>
+
+        <ng-container *ngIf="selectedFile">
+          <i class="fas fa-check-circle gs-drop-icon gs-ok"></i>
+          <p class="gs-file-name">{{ selectedFile.name }}</p>
+          <small>{{ fileSizeLabel }}</small>
+          <button class="gs-clear-btn" (click)="clearFile()"><i class="fas fa-trash"></i> Supprimer</button>
+        </ng-container>
+      </div>
+
+      <!-- Iterations selector -->
+      <div class="gs-options">
+        <label>Qualité d'entraînement</label>
+        <div class="gs-radio-group">
+          <label class="gs-radio" [class.active]="iterations === 3000">
+            <input type="radio" name="iter" [value]="3000" [(ngModel)]="iterations"> Rapide (3 000 it.)
+          </label>
+          <label class="gs-radio" [class.active]="iterations === 7000">
+            <input type="radio" name="iter" [value]="7000" [(ngModel)]="iterations"> Standard (7 000 it.)
+          </label>
+          <label class="gs-radio" [class.active]="iterations === 30000">
+            <input type="radio" name="iter" [value]="30000" [(ngModel)]="iterations"> Haute qualité (30 000 it.)
+          </label>
+        </div>
+      </div>
+
+      <button class="gs-generate-btn" [disabled]="!selectedFile" (click)="startGeneration()">
+        <i class="fas fa-atom"></i> Générer la scène 3D
+      </button>
+    </ng-container>
+
+    <!-- UPLOADING -->
+    <ng-container *ngIf="state === 'uploading'">
+      <div class="gs-progress-section">
+        <p>Envoi de la vidéo…</p>
+        <div class="gs-progress-bar"><div class="gs-progress-fill" [style.width.%]="uploadPercent"></div></div>
+        <span>{{ uploadPercent }}%</span>
+      </div>
+    </ng-container>
+
+    <!-- PROCESSING -->
+    <ng-container *ngIf="state === 'processing'">
+      <div class="gs-progress-section">
+        <p>{{ currentStep || 'Génération Gaussian Splatting en cours…' }}</p>
+        <div class="gs-progress-bar gs-indeterminate" *ngIf="processingPercent < 5">
+          <div class="gs-progress-fill gs-anim"></div>
+        </div>
+        <ng-container *ngIf="processingPercent >= 5">
+          <div class="gs-progress-bar"><div class="gs-progress-fill" [style.width.%]="processingPercent"></div></div>
+          <span>{{ processingPercent }}%</span>
+        </ng-container>
+        <div class="gs-steps-info">
+          <small>Pipeline : Extraction → COLMAP SfM → Entraînement Gaussian Splatting</small>
+          <small class="gs-warn">Cette étape peut prendre plusieurs minutes selon la longueur de la vidéo.</small>
+        </div>
+      </div>
+    </ng-container>
+
+    <!-- PREVIEW: shown after pipeline reaches AWAITING_VALIDATION -->
+    <ng-container *ngIf="state === 'preview'">
+      <!-- Header info -->
+      <div class="gs-preview-header">
+        <i class="fas fa-eye"></i>
+        <div>
+          <strong>Aperçu de la visite 3D</strong>
+          <p>Naviguez dans la scène, puis acceptez ou refusez le modèle.</p>
+        </div>
+      </div>
+
+      <!-- Spinner while the blob is loading -->
+      <div *ngIf="previewLoading" class="gs-preview-loading">
+        <div class="gs-spinner"></div>
+        <span>Chargement de l'aperçu…</span>
+      </div>
+
+      <!-- 3D Viewer (blob URL so the JWT interceptor provided the file) -->
+      <ng-container *ngIf="!previewLoading && previewUrl">
+        <app-splat-viewer
+          [modelUrl]="previewUrl"
+          [format]="previewFormat"
+          [height]="'460px'">
+        </app-splat-viewer>
+      </ng-container>
+
+      <!-- Error shown inline if preview fetch failed -->
+      <div *ngIf="!previewLoading && !previewUrl && errorMessage" class="gs-error-box gs-error-inline">
+        <i class="fas fa-exclamation-triangle"></i>
+        <p>{{ errorMessage }}</p>
+      </div>
+
+      <!-- Accept / Reject actions -->
+      <div class="gs-preview-actions">
+        <button
+          class="gs-accept-btn"
+          type="button"
+          [disabled]="actionLoading"
+          (click)="acceptModel()">
+          <i class="fas" [ngClass]="actionLoading ? 'fa-spinner fa-spin' : 'fa-check'"></i>
+          Accepter le modèle
+        </button>
+
+        <button
+          class="gs-reject-btn"
+          type="button"
+          [disabled]="actionLoading"
+          (click)="rejectModel()">
+          <i class="fas fa-times"></i>
+          Refuser le modèle
+        </button>
+      </div>
+
+      <!-- Show error from accept/reject inline -->
+      <div *ngIf="errorMessage && !previewLoading" class="gs-error-box gs-error-inline">
+        <i class="fas fa-exclamation-triangle"></i>
+        <p>{{ errorMessage }}</p>
+      </div>
+    </ng-container>
+
+    <!-- SUCCESS (legacy: COMPLETED status from old pipeline runs) -->
+    <ng-container *ngIf="state === 'success' && generatedSplat">
+      <div class="gs-success-banner">
+        <i class="fas fa-check-circle"></i>
+        <span>Scène 3D générée avec succès !</span>
+      </div>
+      <app-gaussian-viewer [plyUrl]="generatedSplat.plyUrl" class="gs-viewer-inline"></app-gaussian-viewer>
+      <p class="gs-controls-hint">
+        <i class="fas fa-mouse"></i> Clic gauche · rotation &nbsp;|&nbsp;
+        <i class="fas fa-arrows-alt"></i> Molette · zoom &nbsp;|&nbsp;
+        <i class="fas fa-hand-paper"></i> Clic droit · déplacement
+      </p>
+    </ng-container>
+
+    <!-- ERROR -->
+    <ng-container *ngIf="state === 'error'">
+      <div class="gs-error-box">
+        <i class="fas fa-exclamation-triangle"></i>
+        <p>{{ errorMessage }}</p>
+      </div>
+      <button class="gs-retry-btn" (click)="state = 'idle'">
+        <i class="fas fa-redo"></i> Recommencer
+      </button>
+    </ng-container>
+
+  </div>
+</div>

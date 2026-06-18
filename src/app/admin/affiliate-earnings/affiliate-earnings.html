@@ -1,0 +1,83 @@
+<div class="page-wrapper">
+  <div class="page-header">
+    <div class="page-header-left">
+      <h2><i class="fas fa-coins"></i> Mes Gains</h2>
+      <p class="page-subtitle">Historique de toutes vos commissions</p>
+    </div>
+    <div class="page-header-right">
+      <button class="btn btn-outline" (click)="load()"><i class="fas fa-sync-alt"></i> Actualiser</button>
+    </div>
+  </div>
+
+  <div class="alert alert-danger" *ngIf="errorMessage"><i class="fas fa-exclamation-circle"></i> {{ errorMessage }}</div>
+
+  <!-- Earnings summary header -->
+  <div class="earnings-header" *ngIf="!loading && transactions.length > 0">
+    <div>
+      <div class="earnings-title">Total gagné</div>
+      <div class="earnings-total">{{ fmt(totalEarned) }}</div>
+      <div class="earnings-sub">{{ transactions.length }} transaction{{ transactions.length > 1 ? 's' : '' }}</div>
+    </div>
+    <div style="display:flex;gap:2rem;flex-wrap:wrap;">
+      <div>
+        <div class="earnings-title">Payé</div>
+        <div style="font-size:1.25rem;font-weight:700;">{{ fmt(totalPaid) }}</div>
+      </div>
+      <div>
+        <div class="earnings-title">En attente</div>
+        <div style="font-size:1.25rem;font-weight:700;">{{ fmt(totalPending) }}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="filter-bar">
+    <select [(ngModel)]="paidFilter" (change)="applyFilters()">
+      <option value="">Toutes les commissions</option>
+      <option value="paid">Payées</option>
+      <option value="unpaid">En attente</option>
+    </select>
+  </div>
+
+  <div class="loading-state" *ngIf="loading"><i class="fas fa-spinner fa-spin"></i><span>Chargement…</span></div>
+
+  <div class="empty-state" *ngIf="!loading && filtered.length === 0">
+    <i class="fas fa-coins fa-3x"></i>
+    <h3>Aucune commission</h3>
+    <p>Vos commissions apparaîtront ici après acceptation de vos offres.</p>
+  </div>
+
+  <div class="table-card" *ngIf="!loading && filtered.length > 0">
+    <div class="table-header">
+      <h3><i class="fas fa-list"></i> {{ filtered.length }} transaction{{ filtered.length > 1 ? 's' : '' }}</h3>
+    </div>
+    <div class="offers-wrapper">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Bien</th>
+            <th>Prix de vente</th>
+            <th>Taux commission</th>
+            <th>Ma commission</th>
+            <th>Statut paiement</th>
+            <th>Date</th>
+            <th>Payé le</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let t of filtered">
+            <td style="font-weight:600;font-size:0.875rem;">{{ t.propertyTitle }}</td>
+            <td style="font-size:0.875rem;">{{ fmt(t.propertyPrice) }}</td>
+            <td style="font-size:0.875rem;">{{ t.commissionPercentage }}%</td>
+            <td style="font-weight:700;color:var(--success);">{{ fmt(t.commissionAmount) }}</td>
+            <td>
+              <span class="paid-badge" *ngIf="t.isPaid"><i class="fas fa-check"></i> Payée</span>
+              <span class="unpaid-badge" *ngIf="!t.isPaid"><i class="fas fa-clock"></i> En attente</span>
+            </td>
+            <td style="font-size:0.8125rem;color:var(--text-muted);">{{ formatDate(t.transactionDate) }}</td>
+            <td style="font-size:0.8125rem;color:var(--text-muted);">{{ t.isPaid ? formatDate(t.paymentDate || '') : '—' }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,146 @@
+<div class="page-wrapper">
+  <!-- Page Header -->
+  <div class="page-header">
+    <div class="page-header-left">
+      <h2><i class="fas fa-user-clock"></i> Candidatures Affiliés</h2>
+      <p class="page-subtitle">Examinez et approuvez les demandes d'affiliation en attente</p>
+    </div>
+    <div class="page-header-right">
+      <button class="btn btn-outline" (click)="load()">
+        <i class="fas fa-sync-alt"></i> Actualiser
+      </button>
+    </div>
+  </div>
+
+  <!-- Alerts -->
+  <div class="alert alert-success" *ngIf="successMessage" (click)="clearMessages()">
+    <i class="fas fa-check-circle"></i> {{ successMessage }}
+  </div>
+  <div class="alert alert-danger" *ngIf="errorMessage" (click)="clearMessages()">
+    <i class="fas fa-exclamation-circle"></i> {{ errorMessage }}
+  </div>
+
+  <!-- Loading -->
+  <div class="loading-state" *ngIf="loading">
+    <i class="fas fa-spinner fa-spin"></i>
+    <span>Chargement des candidatures…</span>
+  </div>
+
+  <!-- Empty state -->
+  <div class="empty-state" *ngIf="!loading && applications.length === 0">
+    <i class="fas fa-inbox fa-3x"></i>
+    <h3>Aucune candidature en attente</h3>
+    <p>Toutes les demandes d'affiliation ont été traitées.</p>
+  </div>
+
+  <!-- Applications Grid -->
+  <div class="applications-grid" *ngIf="!loading && applications.length > 0">
+    <div class="application-card" *ngFor="let app of applications">
+      <div class="card-header-info">
+        <div class="avatar-circle">{{ app.prenom.charAt(0).toUpperCase() }}</div>
+        <div class="applicant-info">
+          <h4>{{ app.prenom }} {{ app.nom }}</h4>
+          <span class="email">{{ app.email }}</span>
+          <span class="phone" *ngIf="app.telephone">{{ app.telephone }}</span>
+        </div>
+        <span class="status-badge status-pending">En attente</span>
+      </div>
+
+      <div class="card-body-info">
+        <div class="info-row">
+          <i class="fas fa-calendar-alt"></i>
+          <span>Candidature: {{ formatDate(app.createdAt) }}</span>
+        </div>
+        <div class="info-row" *ngIf="app.experienceLevel">
+          <i class="fas fa-briefcase"></i>
+          <span>Expérience: {{ app.experienceLevel }}</span>
+        </div>
+        <div class="regions-section" *ngIf="app.regions?.length">
+          <div class="regions-label"><i class="fas fa-map-marker-alt"></i> Zones demandées:</div>
+          <div class="regions-tags">
+            <span class="region-tag" *ngFor="let r of app.regions">
+              {{ r.city ?? r.regionName }}
+            </span>
+          </div>
+        </div>
+        <div class="notes-section" *ngIf="app.notes">
+          <p class="notes-text"><i class="fas fa-sticky-note"></i> {{ app.notes }}</p>
+        </div>
+      </div>
+
+      <div class="card-actions">
+        <button class="btn btn-ghost" (click)="openDetail(app)">
+          <i class="fas fa-eye"></i> Détails
+        </button>
+        <button class="btn btn-danger-outline" (click)="openRejectModal(app)">
+          <i class="fas fa-times"></i> Rejeter
+        </button>
+        <button class="btn btn-success" (click)="approve(app)" [disabled]="actionLoading">
+          <i class="fas fa-check"></i> Approuver
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Detail Modal -->
+<div class="modal-overlay" *ngIf="detailModalOpen" (click)="closeDetail()">
+  <div class="modal-box" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3><i class="fas fa-user"></i> Détails de la candidature</h3>
+      <button class="modal-close" (click)="closeDetail()"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="modal-body" *ngIf="selectedAffiliate">
+      <div class="detail-row"><label>Nom complet</label><span>{{ selectedAffiliate.prenom }} {{ selectedAffiliate.nom }}</span></div>
+      <div class="detail-row"><label>Email</label><span>{{ selectedAffiliate.email }}</span></div>
+      <div class="detail-row" *ngIf="selectedAffiliate.telephone"><label>Téléphone</label><span>{{ selectedAffiliate.telephone }}</span></div>
+      <div class="detail-row" *ngIf="selectedAffiliate.experienceLevel"><label>Expérience</label><span>{{ selectedAffiliate.experienceLevel }}</span></div>
+      <div class="detail-row"><label>Date candidature</label><span>{{ formatDate(selectedAffiliate.createdAt) }}</span></div>
+      <div class="detail-section" *ngIf="selectedAffiliate.regions?.length">
+        <label>Zones</label>
+        <table class="regions-table">
+          <thead><tr><th>Zone</th><th>Pays</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr *ngFor="let r of selectedAffiliate.regions">
+              <td>{{ r.city ?? r.regionName }}</td>
+              <td>{{ r.country || '—' }}</td>
+              <td>{{ r.regionDescription || '—' }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="detail-row" *ngIf="selectedAffiliate.notes"><label>Notes</label><span>{{ selectedAffiliate.notes }}</span></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-danger-outline" (click)="closeDetail(); openRejectModal(selectedAffiliate!)">
+        <i class="fas fa-times"></i> Rejeter
+      </button>
+      <button class="btn btn-success" (click)="approve(selectedAffiliate!)" [disabled]="actionLoading">
+        <i class="fas fa-check"></i> Approuver
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Reject Reason Modal -->
+<div class="modal-overlay" *ngIf="rejectModalOpen" (click)="closeRejectModal()">
+  <div class="modal-box modal-sm" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3><i class="fas fa-times-circle text-danger"></i> Rejeter la candidature</h3>
+      <button class="modal-close" (click)="closeRejectModal()"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="modal-body">
+      <p>Vous êtes sur le point de rejeter la candidature de <strong>{{ rejectTarget?.prenom }} {{ rejectTarget?.nom }}</strong>.</p>
+      <div class="form-group">
+        <label>Motif du rejet <span class="required">*</span></label>
+        <textarea [(ngModel)]="rejectReason" rows="4" placeholder="Expliquez la raison du rejet…" class="form-control"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" (click)="closeRejectModal()">Annuler</button>
+      <button class="btn btn-danger" (click)="confirmReject()" [disabled]="!rejectReason.trim() || actionLoading">
+        <i class="fas fa-times-circle"></i> Confirmer le rejet
+      </button>
+    </div>
+  </div>
+</div>

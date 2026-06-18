@@ -1,0 +1,177 @@
+<div class="messaging-shell">
+
+  <!-- ══════════════════ LEFT PANEL ══════════════════ -->
+  <aside class="contacts-panel">
+
+    <div class="contacts-header">
+      <div class="contacts-title">
+        <h3>Messagerie</h3>
+        <span class="unread-global" *ngIf="totalUnread() > 0">{{ totalUnread() }}</span>
+      </div>
+      <div class="search-box">
+        <i class="fas fa-search"></i>
+        <input
+          type="text"
+          placeholder="Rechercher un contact…"
+          [(ngModel)]="searchQuery"
+          (input)="onSearch()"
+        />
+      </div>
+    </div>
+
+    <!-- Loading skeleton -->
+    <div class="contacts-loading" *ngIf="loadingContacts">
+      <div class="contact-skeleton" *ngFor="let i of [1,2,3,4,5]">
+        <div class="sk-avatar"></div>
+        <div class="sk-lines">
+          <div class="sk-line sk-name"></div>
+          <div class="sk-line sk-msg"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Contact list -->
+    <div class="contacts-list" *ngIf="!loadingContacts">
+      <div
+        class="contact-item"
+        *ngFor="let contact of filteredContacts"
+        [class.active]="selectedContact?.id === contact.id"
+        [class.has-unread]="contact.unreadCount > 0"
+        (click)="selectContact(contact)"
+      >
+        <div class="contact-avatar" [ngClass]="getRoleClass(contact.role)">
+          {{ getInitials(contact.fullName) }}
+        </div>
+        <div class="contact-info">
+          <div class="contact-top">
+            <span class="contact-name">{{ contact.fullName }}</span>
+            <span class="contact-time">{{ formatTime(contact.lastMessageTime) }}</span>
+          </div>
+          <div class="contact-bottom">
+            <span class="contact-preview" *ngIf="contact.lastMessage; else noMsg">
+              {{ contact.lastMessage }}
+            </span>
+            <ng-template #noMsg>
+              <span class="contact-preview no-msg">Nouvelle conversation</span>
+            </ng-template>
+            <span class="unread-badge" *ngIf="contact.unreadCount > 0">
+              {{ contact.unreadCount }}
+            </span>
+          </div>
+          <span class="role-tag" [ngClass]="getRoleClass(contact.role)">
+            {{ formatRoleName(contact.role) }}
+          </span>
+        </div>
+      </div>
+
+      <div class="contacts-empty" *ngIf="filteredContacts.length === 0 && !loadingContacts">
+        <i class="fas fa-user-slash"></i>
+        <p *ngIf="searchQuery">Aucun contact pour « {{ searchQuery }} »</p>
+        <p *ngIf="!searchQuery">Aucun contact disponible selon votre rôle.</p>
+      </div>
+    </div>
+
+  </aside>
+
+  <!-- ══════════════════ MAIN CHAT PANEL ══════════════════ -->
+  <main class="chat-panel">
+
+    <!-- Empty state: no conversation selected -->
+    <div class="chat-empty" *ngIf="!selectedContact">
+      <div class="chat-empty-icon"><i class="fas fa-comments"></i></div>
+      <h4>Sélectionnez une conversation</h4>
+      <p>Choisissez un contact à gauche pour démarrer ou continuer un échange.</p>
+    </div>
+
+    <!-- Active conversation -->
+    <ng-container *ngIf="selectedContact">
+
+      <!-- Chat header -->
+      <header class="chat-header">
+        <div class="chat-header-left">
+          <div class="chat-avatar" [ngClass]="getRoleClass(selectedContact.role)">
+            {{ getInitials(selectedContact.fullName) }}
+          </div>
+          <div>
+            <p class="chat-name">{{ selectedContact.fullName }}</p>
+            <span class="role-tag" [ngClass]="getRoleClass(selectedContact.role)">
+              {{ formatRoleName(selectedContact.role) }}
+            </span>
+          </div>
+        </div>
+        <span class="chat-email">{{ selectedContact.email }}</span>
+      </header>
+
+      <!-- Messages thread -->
+      <div class="chat-messages" #chatScroll>
+
+        <div class="messages-loading" *ngIf="loadingMessages">
+          <div class="msg-skeleton" *ngFor="let i of [1,2,3]">
+            <div class="sk-bubble"></div>
+          </div>
+        </div>
+
+        <ng-container *ngIf="!loadingMessages">
+          <div class="chat-empty-thread" *ngIf="messages.length === 0">
+            <i class="fas fa-comment-dots"></i>
+            <p>Aucun message encore. Commencez la conversation !</p>
+          </div>
+
+          <div
+            class="msg-row"
+            *ngFor="let msg of messages"
+            [class.msg-mine]="msg.senderId === currentUserId"
+            [class.msg-theirs]="msg.senderId !== currentUserId"
+          >
+            <div class="msg-avatar-small" *ngIf="msg.senderId !== currentUserId"
+                 [ngClass]="getRoleClass(msg.senderRole)">
+              {{ getInitials(msg.senderName) }}
+            </div>
+            <div class="msg-bubble-wrap">
+              <p class="msg-sender-label" *ngIf="msg.senderId !== currentUserId">
+                {{ msg.senderName }}
+              </p>
+              <div class="msg-bubble">
+                <span class="msg-text">{{ msg.content }}</span>
+              </div>
+              <span class="msg-time-label" [title]="formatFullTime(msg.createdAt)">
+                {{ formatTime(msg.createdAt) }}
+                <i class="fas fa-check-double" *ngIf="msg.senderId === currentUserId && msg.read"></i>
+                <i class="fas fa-check" *ngIf="msg.senderId === currentUserId && !msg.read"></i>
+              </span>
+            </div>
+          </div>
+        </ng-container>
+
+      </div>
+
+      <!-- Input area -->
+      <footer class="chat-input-area">
+        <div class="chat-input-error" *ngIf="sendError">
+          <i class="fas fa-exclamation-triangle"></i> {{ sendError }}
+        </div>
+        <div class="chat-input-row">
+          <textarea
+            class="chat-input"
+            placeholder="Écrivez votre message… (Entrée pour envoyer)"
+            [(ngModel)]="newMessageContent"
+            (keydown)="onEnterKey($event)"
+            rows="1"
+            maxlength="2000"
+          ></textarea>
+          <button
+            class="send-btn"
+            (click)="sendMessage()"
+            [disabled]="sendingMessage || !newMessageContent.trim()"
+            [title]="'Envoyer'"
+          >
+            <i class="fas" [class.fa-paper-plane]="!sendingMessage" [class.fa-spinner]="sendingMessage"
+               [class.fa-spin]="sendingMessage"></i>
+          </button>
+        </div>
+      </footer>
+
+    </ng-container>
+  </main>
+
+</div>

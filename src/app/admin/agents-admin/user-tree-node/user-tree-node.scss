@@ -1,0 +1,350 @@
+// user-tree-node.component.scss
+.tree-node {
+  position: relative;
+  
+  .tree-node-content {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background: var(--bg-card, #ffffff);
+    margin-bottom: 4px;
+    
+    &:hover {
+      background: var(--bg-hover, #f3f4f6);
+      transform: translateX(4px);
+      
+      .user-actions {
+        opacity: 1;
+        visibility: visible;
+      }
+    }
+  }
+  
+  // Toggle Icon
+  .tree-toggle {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    
+    .toggle-icon {
+      color: var(--text-secondary, #6b7280);
+      font-size: 12px;
+      transition: transform 0.2s ease;
+    }
+    
+    .leaf-icon {
+      color: var(--text-secondary, #6b7280);
+      font-size: 6px;
+      opacity: 0.5;
+    }
+  }
+  
+  // User Avatar
+  .user-avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: 700;
+    font-size: 1.1rem;
+    flex-shrink: 0;
+    transition: transform 0.2s ease;
+    overflow: hidden;
+
+    &:hover {
+      transform: scale(1.05);
+    }
+
+    .user-avatar-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+  }
+  
+  // User Info
+  .user-info {
+    flex: 1;
+    min-width: 0;
+    
+    .user-name {
+      font-weight: 600;
+      color: var(--text-primary, #1f2937);
+      font-size: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      
+      .agent-count-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 2px 8px;
+        background: rgba(59, 130, 246, 0.1);
+        color: #3b82f6;
+        border-radius: 20px;
+        font-size: 0.7rem;
+        font-weight: 500;
+        
+        i {
+          font-size: 0.65rem;
+        }
+      }
+    }
+    
+    .user-email,
+    .user-phone {
+      font-size: 0.75rem;
+      color: var(--text-secondary, #6b7280);
+      margin-top: 2px;
+      
+      i {
+        margin-right: 4px;
+        font-size: 0.65rem;
+        width: 14px;
+      }
+    }
+  }
+  
+  // Role Badge
+  .role-badge {
+    padding: 6px 14px;
+    border-radius: 24px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: white;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+    white-space: nowrap;
+    
+    i {
+      font-size: 0.7rem;
+    }
+  }
+  
+  // Status Indicator
+  .status-indicator {
+    width: 32px;
+    display: flex;
+    justify-content: center;
+    flex-shrink: 0;
+    
+    i {
+      font-size: 10px;
+    }
+    
+    &.active i {
+      color: #10b981;
+      text-shadow: 0 0 4px rgba(16, 185, 129, 0.5);
+    }
+    
+    &.inactive i {
+      color: #ef4444;
+    }
+  }
+  
+  // Actions Buttons
+  .user-actions {
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.2s ease;
+    
+    .action-btn {
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: none;
+      background: transparent;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      color: var(--text-secondary, #6b7280);
+      
+      &:hover {
+        background: rgba(0, 0, 0, 0.08);
+        transform: scale(1.1);
+      }
+      
+      &.view-btn:hover {
+        color: #3b82f6;
+        background: rgba(59, 130, 246, 0.1);
+      }
+      
+      &.edit-btn:hover {
+        color: #10b981;
+        background: rgba(16, 185, 129, 0.1);
+      }
+    }
+  }
+  
+  // Children Container
+  .tree-children {
+    margin-left: 36px;
+    position: relative;
+    
+    .children-container {
+      position: relative;
+      padding-left: 20px;
+      
+      .tree-line {
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background: linear-gradient(to bottom, 
+          var(--border-color, #e5e7eb) 0%,
+          var(--border-color, #e5e7eb) 100%
+        );
+        border-radius: 2px;
+      }
+      
+      .children-list {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+    }
+  }
+}
+
+// Responsive Design
+@media (max-width: 768px) {
+  .tree-node {
+    .tree-node-content {
+      padding: 10px 12px;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    
+    .user-avatar {
+      width: 40px;
+      height: 40px;
+      font-size: 0.9rem;
+    }
+    
+    .user-info {
+      width: calc(100% - 120px);
+      
+      .user-name {
+        font-size: 0.9rem;
+      }
+    }
+    
+    .role-badge {
+      padding: 4px 10px;
+      font-size: 0.7rem;
+    }
+    
+    .status-indicator {
+      width: 24px;
+    }
+    
+    .user-actions {
+      opacity: 1;
+      visibility: visible;
+      
+      .action-btn {
+        width: 28px;
+        height: 28px;
+      }
+    }
+    
+    .tree-children {
+      margin-left: 20px;
+      
+      .children-container {
+        padding-left: 12px;
+      }
+    }
+  }
+}
+
+// Loading skeleton animation
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+// Dark mode support
+@media (prefers-color-scheme: dark) {
+  .tree-node {
+    .tree-node-content {
+      background: var(--bg-card, #1f2937);
+      
+      &:hover {
+        background: var(--bg-hover, #374151);
+      }
+    }
+    
+    .tree-children {
+      .children-container {
+        .tree-line {
+          background: linear-gradient(to bottom, 
+            var(--border-color, #374151) 0%,
+            var(--border-color, #374151) 100%
+          );
+        }
+      }
+    }
+  }
+}
+
+// Animation for expand/collapse
+.tree-children {
+  animation: slideDown 0.2s ease-out;
+  transform-origin: top;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+// Scrollbar styling
+.tree-children::-webkit-scrollbar {
+  width: 4px;
+}
+
+.tree-children::-webkit-scrollbar-track {
+  background: var(--bg-secondary, #f3f4f6);
+  border-radius: 4px;
+}
+
+.tree-children::-webkit-scrollbar-thumb {
+  background: var(--border-color, #d1d5db);
+  border-radius: 4px;
+  
+  &:hover {
+    background: #9ca3af;
+  }
+}

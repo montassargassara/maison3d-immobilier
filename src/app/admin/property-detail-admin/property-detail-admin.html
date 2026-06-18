@@ -1,0 +1,469 @@
+<section class="prop-detail">
+
+  <!-- ── Back bar ──────────────────────────────────────────────────────────── -->
+  <div class="detail-topbar">
+    <button class="btn-back" type="button" (click)="goBack()">
+      <i class="fas fa-arrow-left"></i> Retour aux biens
+    </button>
+    @if (property && canEdit) {
+      <a class="btn-edit" [routerLink]="['/admin/properties/edit', property.id]">
+        <i class="fas fa-pen-to-square"></i> Modifier
+      </a>
+    }
+  </div>
+
+  <!-- ── Loading ───────────────────────────────────────────────────────────── -->
+  @if (loading) {
+    <div class="detail-loading">
+      <div class="spinner"></div>
+      <p>Chargement du bien…</p>
+    </div>
+  }
+
+  @if (errorMessage && !loading) {
+    <div class="detail-error">
+      <i class="fas fa-triangle-exclamation"></i> {{ errorMessage }}
+    </div>
+  }
+
+  @if (property && !loading) {
+
+    <!-- ── Hero ───────────────────────────────────────────────────────────── -->
+    <div class="detail-hero">
+      <div class="hero-image-wrap">
+        @if (getImageUrl(property)) {
+          <img [src]="getImageUrl(property)" [alt]="property.titre"
+               class="hero-image" (error)="onImageError($event)" />
+        } @else {
+          <div class="hero-placeholder"><i class="fas fa-image"></i></div>
+        }
+        <span class="hero-status-badge" [ngClass]="getStatusClass(property.statut)">
+          {{ getStatusLabel(property.statut) }}
+        </span>
+      </div>
+
+      <div class="hero-info">
+        <div class="hero-ref">{{ getReference(property) }}</div>
+        <h1 class="hero-title">{{ property.titre }}</h1>
+        <div class="hero-location">
+          <i class="fas fa-location-dot"></i> {{ getLocation(property) }}
+        </div>
+        <div class="hero-price">{{ formatPrice(property) }}</div>
+
+        <div class="hero-chips">
+          @if (property.type) {
+            <span class="hero-chip"><i class="fas fa-home"></i> {{ property.type }}</span>
+          }
+          @if (property.surface) {
+            <span class="hero-chip"><i class="fas fa-ruler-combined"></i> {{ property.surface }} m²</span>
+          }
+          @if (property.nbChambres) {
+            <span class="hero-chip"><i class="fas fa-bed"></i> {{ property.nbChambres }} chambre(s)</span>
+          }
+          @if (property.hasModel3d) {
+            <span class="hero-chip hero-chip--3d"><i class="fas fa-cube"></i> Modèle 3D</span>
+          }
+          @if (property.isActive) {
+            <span class="hero-chip hero-chip--active"><i class="fas fa-circle-check"></i> Actif</span>
+          }
+        </div>
+
+        @if (isPropertyLocked(property)) {
+          <div class="hero-locked">
+            <i class="fas fa-lock"></i>
+            {{ property.statut === 'VENDU' ? 'Bien vendu — statut verrouillé' : 'Bien loué — statut verrouillé' }}
+          </div>
+        }
+      </div>
+    </div>
+
+    <!-- ── Tabs ───────────────────────────────────────────────────────────── -->
+    <div class="detail-tabs">
+      <button class="detail-tab" [class.active]="activeTab === 'info'"
+              (click)="activeTab = 'info'" type="button">
+        <i class="fas fa-info-circle"></i> Informations
+      </button>
+      <button class="detail-tab" [class.active]="activeTab === 'leads'"
+              (click)="activeTab = 'leads'" type="button">
+        <i class="fas fa-heart"></i> Leads CRM
+        @if (leads.length > 0) {
+          <span class="tab-count">{{ leads.length }}</span>
+        }
+      </button>
+      <button class="detail-tab" [class.active]="activeTab === 'media'"
+              (click)="activeTab = 'media'" type="button">
+        <i class="fas fa-images"></i> Médias
+      </button>
+      <button class="detail-tab" [class.active]="activeTab === 'tour'"
+              (click)="activeTab = 'tour'" type="button">
+        <i class="fas fa-vr-cardboard"></i> Visite Virtuelle
+        @if (virtualTour?.status === 'COMPLETED') {
+          <span class="tab-count tab-count--tour">{{ virtualTour!.sceneCount }}</span>
+        }
+      </button>
+    </div>
+
+    <!-- ── TAB: Info ──────────────────────────────────────────────────────── -->
+    @if (activeTab === 'info') {
+      <div class="tab-body">
+
+        <!-- Ownership -->
+        <div class="info-section">
+          <h3 class="section-heading"><i class="fas fa-building"></i> Propriété & Agence</h3>
+          <div class="info-grid">
+            <div class="info-row">
+              <span class="info-label">Type de propriété</span>
+              <span class="info-val">
+                @if (property.ownerType === 'SUPER_ADMIN_OWNED') { Super Admin }
+                @else if (property.ownerType === 'AGENCY_OWNED') { Agence }
+                @else { Hérité }
+              </span>
+            </div>
+            @if (property.agencyAdminName) {
+              <div class="info-row">
+                <span class="info-label">Agence</span>
+                <span class="info-val">{{ property.agencyAdminName }}</span>
+              </div>
+            }
+            @if (property.createdByName) {
+              <div class="info-row">
+                <span class="info-label">Créé par</span>
+                <span class="info-val">{{ property.createdByName }}</span>
+              </div>
+            }
+            @if (property.sharedWithAgencyIds && property.sharedWithAgencyIds.length > 0) {
+              <div class="info-row">
+                <span class="info-label">Partagé avec</span>
+                <span class="info-val">{{ property.sharedWithAgencyIds.length }} agence(s)</span>
+              </div>
+            }
+            @if (property.buyerName) {
+              <div class="info-row">
+                <span class="info-label">Acheteur / Locataire</span>
+                <span class="info-val buyer-val"><i class="fas fa-user-check"></i> {{ property.buyerName }}</span>
+              </div>
+            }
+          </div>
+        </div>
+
+        <!-- Description -->
+        @if (property.description) {
+          <div class="info-section">
+            <h3 class="section-heading"><i class="fas fa-align-left"></i> Description</h3>
+            <p class="info-desc">{{ property.description }}</p>
+          </div>
+        }
+
+        <!-- Caractéristiques -->
+        <div class="info-section">
+          <h3 class="section-heading"><i class="fas fa-list-check"></i> Caractéristiques</h3>
+          <div class="info-grid">
+            <div class="info-row">
+              <span class="info-label">Catégorie</span>
+              <span class="info-val">{{ getCategory(property) === 'VENTE' ? 'Vente' : 'Location' }}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Type</span>
+              <span class="info-val">{{ property.type || '—' }}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Surface</span>
+              <span class="info-val">{{ property.surface ? property.surface + ' m²' : '—' }}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Chambres</span>
+              <span class="info-val">{{ property.nbChambres ?? '—' }}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Adresse</span>
+              <span class="info-val">{{ property.adresse || '—' }}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Pays / Ville</span>
+              <span class="info-val">{{ getLocation(property) }}</span>
+            </div>
+            @if (property.prixVente && property.prixVente > 0) {
+              <div class="info-row">
+                <span class="info-label">Prix de vente</span>
+                <span class="info-val price-val">
+                  {{ property.prixVente.toLocaleString('fr-FR') }} TND
+                </span>
+              </div>
+            }
+            @if (property.prixLocation && property.prixLocation > 0) {
+              <div class="info-row">
+                <span class="info-label">Loyer mensuel</span>
+                <span class="info-val price-val">
+                  {{ property.prixLocation.toLocaleString('fr-FR') }} TND / mois
+                </span>
+              </div>
+            }
+          </div>
+        </div>
+
+        <!-- Rental contract (if LOUE) -->
+        @if (property.statut === 'LOUE' && property.rentalEndDate) {
+          <div class="info-section">
+            <h3 class="section-heading"><i class="fas fa-file-contract"></i> Contrat de location</h3>
+            <div class="info-grid">
+              <div class="info-row">
+                <span class="info-label">Durée</span>
+                <span class="info-val">{{ property.rentalDurationMonths ?? '—' }} mois</span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">Fin de bail</span>
+                <span class="info-val">{{ formatDate(property.rentalEndDate?.toString()) }}</span>
+              </div>
+            </div>
+          </div>
+        }
+
+        <!-- Cross-ownership validation alert -->
+        @if (property.hasPendingValidation) {
+          <div class="alert-validation">
+            <i class="fas fa-shield-halved"></i>
+            <div>
+              <strong>Validation propriétaire en attente</strong>
+              <p>Une demande de vente/location croisée est en cours d'approbation.</p>
+            </div>
+            <a class="btn-validate" routerLink="/admin/sale-validations">
+              Voir les validations
+            </a>
+          </div>
+        }
+
+        <!-- Dates -->
+        <div class="info-section">
+          <h3 class="section-heading"><i class="fas fa-calendar"></i> Dates</h3>
+          <div class="info-grid">
+            <div class="info-row">
+              <span class="info-label">Créé le</span>
+              <span class="info-val">{{ formatDate(property.createdAt) }}</span>
+            </div>
+            @if (property.updatedAt) {
+              <div class="info-row">
+                <span class="info-label">Modifié le</span>
+                <span class="info-val">{{ formatDate(property.updatedAt) }}</span>
+              </div>
+            }
+          </div>
+        </div>
+
+      </div>
+    }
+
+    <!-- ── TAB: Leads ─────────────────────────────────────────────────────── -->
+    @if (activeTab === 'leads') {
+      <div class="tab-body">
+        @if (leadsLoading) {
+          <div class="detail-loading detail-loading--sm">
+            <div class="spinner"></div><p>Chargement des leads…</p>
+          </div>
+        } @else if (leads.length === 0) {
+          <div class="leads-empty">
+            <i class="fas fa-heart-crack"></i>
+            <p>Aucun lead pour ce bien.</p>
+          </div>
+        } @else {
+
+          @if (activeLeads.length > 0) {
+            <div class="leads-section-title">
+              <i class="fas fa-fire-flame-curved"></i> Leads actifs ({{ activeLeads.length }})
+            </div>
+            <div class="leads-list">
+              @for (lead of activeLeads; track lead.id) {
+                <div class="lead-card">
+                  <div class="lead-card-header">
+                    <div class="lead-avatar">{{ lead.fullName.charAt(0).toUpperCase() }}</div>
+                    <div class="lead-info">
+                      <span class="lead-name">{{ lead.fullName }}</span>
+                      <span class="lead-email">{{ lead.email }}</span>
+                    </div>
+                    <span class="lead-status-pill"
+                          [style.background]="getLeadStatusColor(lead.status) + '22'"
+                          [style.color]="getLeadStatusColor(lead.status)"
+                          [style.border]="'1px solid ' + getLeadStatusColor(lead.status) + '44'">
+                      {{ getLeadStatusLabel(lead.status) }}
+                    </span>
+                  </div>
+                  <div class="lead-contact-row">
+                    <a [href]="'tel:' + lead.telephone" class="lead-btn">
+                      <i class="fas fa-phone"></i> {{ lead.telephone }}
+                    </a>
+                    <a [href]="'https://wa.me/' + formatWhatsApp(lead.telephone)" target="_blank"
+                       class="lead-btn lead-btn--wa">
+                      <i class="fab fa-whatsapp"></i> WhatsApp
+                    </a>
+                    <a [href]="'mailto:' + lead.email" class="lead-btn">
+                      <i class="fas fa-envelope"></i>
+                    </a>
+                  </div>
+                  @if (lead.message) {
+                    <p class="lead-message">{{ lead.message }}</p>
+                  }
+                  @if (lead.proposedBudget) {
+                    <div class="lead-budget">
+                      <i class="fas fa-coins"></i> Budget proposé :
+                      {{ lead.proposedBudget.toLocaleString('fr-FR') }} TND
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+          }
+
+          @if (convertedLeads.length > 0) {
+            <div class="leads-section-title leads-section-title--muted">
+              <i class="fas fa-history"></i> Historique ({{ convertedLeads.length }})
+            </div>
+            <div class="leads-list">
+              @for (lead of convertedLeads; track lead.id) {
+                <div class="lead-card lead-card--archived">
+                  <div class="lead-card-header">
+                    <div class="lead-avatar lead-avatar--muted">{{ lead.fullName.charAt(0).toUpperCase() }}</div>
+                    <div class="lead-info">
+                      <span class="lead-name">{{ lead.fullName }}</span>
+                      <span class="lead-email">{{ lead.email }}</span>
+                    </div>
+                    <span class="lead-status-pill"
+                          [style.background]="getLeadStatusColor(lead.status) + '22'"
+                          [style.color]="getLeadStatusColor(lead.status)"
+                          [style.border]="'1px solid ' + getLeadStatusColor(lead.status) + '44'">
+                      {{ getLeadStatusLabel(lead.status) }}
+                    </span>
+                  </div>
+                  @if (lead.status === 'CONVERTI_LOCATION' && lead.rentalStartDate) {
+                    <div class="lead-rental-info">
+                      <i class="fas fa-file-contract"></i>
+                      Du {{ formatDate(lead.rentalStartDate) }} au {{ formatDate(lead.rentalEndDate) }}
+                      @if (lead.rentalAmount) { — {{ lead.rentalAmount }} TND/mois }
+                    </div>
+                  }
+                  @if (lead.rejectionMessage) {
+                    <p class="lead-rejection">
+                      <i class="fas fa-comment-slash"></i> {{ lead.rejectionMessage }}
+                    </p>
+                  }
+                </div>
+              }
+            </div>
+          }
+
+        }
+      </div>
+    }
+
+    <!-- ── TAB: Médias ────────────────────────────────────────────────────── -->
+    @if (activeTab === 'media') {
+      <div class="tab-body">
+        <div class="media-section">
+
+          @if (getImageUrl(property)) {
+            <div class="media-block">
+              <h3 class="section-heading"><i class="fas fa-image"></i> Image principale</h3>
+              <img [src]="getImageUrl(property)" [alt]="property.titre"
+                   class="media-main-image" (error)="onImageError($event)" />
+            </div>
+          }
+
+          @if (property.hasModel3d) {
+            <div class="media-block">
+              <h3 class="section-heading"><i class="fas fa-cube"></i> Modèle 3D</h3>
+              <div class="media-chip">
+                <i class="fas fa-cube"></i>
+                {{ property.model3dName ?? 'Modèle 3D disponible' }}
+              </div>
+              <p class="media-hint">
+                Le modèle 3D est disponible sur la fiche publique du bien.
+                <a [routerLink]="['/biens', property.id]" target="_blank">Voir sur le portail public <i class="fas fa-external-link-alt"></i></a>
+              </p>
+            </div>
+          }
+
+          @if (!getImageUrl(property) && !property.hasModel3d) {
+            <div class="leads-empty">
+              <i class="fas fa-image"></i>
+              <p>Aucun média disponible pour ce bien.</p>
+              @if (canEdit) {
+                <a [routerLink]="['/admin/properties/edit', property.id]" class="btn-add-media">
+                  <i class="fas fa-plus"></i> Ajouter des médias
+                </a>
+              }
+            </div>
+          }
+
+        </div>
+      </div>
+    }
+
+    <!-- ── TAB: Visite Virtuelle ─────────────────────────────────────────── -->
+    @if (activeTab === 'tour') {
+      <div class="tab-body tour-tab-body">
+
+        @if (tourLoading) {
+          <div class="tour-loading">
+            <div class="spinner"></div>
+            <span>Chargement de la visite…</span>
+          </div>
+        }
+
+        <!-- No tour yet -->
+        @if (!tourLoading && (!virtualTour || virtualTour.status === 'FAILED')) {
+          <div class="tour-empty">
+            <div class="tour-empty-icon"><i class="fas fa-vr-cardboard"></i></div>
+            <h3>Aucune visite virtuelle</h3>
+            <p>Générez une visite immersive depuis une vidéo de la propriété.</p>
+            <button class="tour-gen-btn" type="button" (click)="openTourModal()">
+              <i class="fas fa-wand-magic-sparkles"></i>
+              Générer la visite virtuelle
+            </button>
+          </div>
+        }
+
+        <!-- Processing -->
+        @if (!tourLoading && virtualTour && (virtualTour.status === 'PROCESSING' || virtualTour.status === 'PENDING')) {
+          <div class="tour-processing">
+            <div class="tour-processing-icon">
+              <i class="fas fa-cog fa-spin"></i>
+            </div>
+            <h3>Génération en cours…</h3>
+            <p>FFmpeg analyse la vidéo. La visite sera disponible dans quelques instants.</p>
+            <div class="tour-progress-track">
+              <div class="tour-progress-fill" [style.width.%]="virtualTour.processingProgress"></div>
+            </div>
+            <span class="tour-progress-pct">{{ virtualTour.processingProgress }}%</span>
+          </div>
+        }
+
+        <!-- Completed viewer -->
+        @if (!tourLoading && virtualTour?.status === 'COMPLETED') {
+          <div class="tour-viewer-wrap">
+            <div class="tour-viewer-header">
+              <div class="tour-viewer-title">
+                <i class="fas fa-vr-cardboard"></i>
+                <span>{{ virtualTour!.sceneCount }} scènes</span>
+              </div>
+              <button class="tour-regen-btn" type="button" (click)="openTourModal()">
+                <i class="fas fa-arrows-rotate"></i> Regénérer
+              </button>
+            </div>
+            <app-virtual-tour-viewer [tour]="virtualTour!"></app-virtual-tour-viewer>
+          </div>
+        }
+
+      </div>
+    }
+
+  }
+
+  <!-- ── Virtual Tour Modal ── -->
+  @if (showTourModal) {
+    <app-virtual-tour-modal
+      [propertyId]="propertyId"
+      [existingTour]="virtualTour"
+      (closed)="closeTourModal()"
+      (tourGenerated)="onTourGenerated($event)">
+    </app-virtual-tour-modal>
+  }
+
+</section>

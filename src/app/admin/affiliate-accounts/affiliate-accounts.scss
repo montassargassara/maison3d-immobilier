@@ -1,0 +1,79 @@
+@use '../../../styles/affiliate-shared' as *;
+
+// ── Clients apportés (CRM leads, no User) ─────────────────────────────
+.acust-section {
+  margin-top: 18px;
+  border-top: 1px solid #e2e8f0;
+  padding-top: 14px;
+}
+.acust-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 12px;
+
+  i { color: #f59e0b; }
+}
+.acust-count {
+  background: #fef3c7;
+  color: #b45309;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+.acust-loading,
+.acust-empty {
+  font-size: 13px;
+  color: #94a3b8;
+  padding: 16px 0;
+  text-align: center;
+}
+.acust-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+.acust-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+}
+.acust-buyer { font-weight: 700; color: #0f172a; font-size: 13px; }
+.acust-prop {
+  font-size: 12px;
+  color: #64748b;
+  margin-top: 2px;
+  i { margin-right: 4px; }
+}
+.acust-type {
+  margin-left: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: #dbeafe;
+  color: #1d4ed8;
+
+  &.is-rent { background: #ede9fe; color: #6d28d9; }
+}
+.acust-meta { text-align: right; flex-shrink: 0; }
+.acust-amount { font-weight: 800; color: #0f172a; font-size: 13px; }
+.acust-comm   { font-size: 11px; color: #15803d; margin-top: 2px; }
+.acust-status {
+  margin-left: 6px;
+  font-weight: 700;
+  color: #b45309;
+  &.paid { color: #15803d; }
+}
+.acust-date { font-size: 11px; color: #94a3b8; margin-top: 2px; }

@@ -1,0 +1,439 @@
+<div class="page-wrapper">
+  <!-- Welcome header -->
+  @if (profile) {
+    <div class="welcome-banner">
+      <div class="welcome-left">
+        <div class="welcome-avatar">{{ profile.prenom.charAt(0).toUpperCase() }}</div>
+        <div>
+          <h2>Bonjour, {{ profile.prenom }} {{ profile.nom }}</h2>
+          <p>Bienvenue dans votre espace affilié</p>
+        </div>
+      </div>
+      <div class="welcome-right">
+        <span class="status-badge" [ngClass]="getStatusClass(profile.status)">{{ formatStatus(profile.status) }}</span>
+        @if (stats?.rank && stats!.rank! <= 3) {
+          <span class="bonus-badge reward-badge">
+            <i class="fas fa-coins"></i> {{ fmt(stats!.monthlyRewardAmount ?? 0) }} ce mois
+          </span>
+        }
+      </div>
+    </div>
+  }
+
+  @if (errorMessage) {
+    <div class="alert alert-danger" (click)="clearMessages()">
+      <i class="fas fa-exclamation-circle"></i> {{ errorMessage }}
+    </div>
+  }
+  @if (successMessage) {
+    <div class="alert alert-success" (click)="clearMessages()">
+      <i class="fas fa-check-circle"></i> {{ successMessage }}
+    </div>
+  }
+
+  @if (loading) {
+    <div class="loading-state"><i class="fas fa-spinner fa-spin"></i><span>Chargement…</span></div>
+  }
+
+  <!-- KPI Cards -->
+  @if (!loading && stats) {
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-icon kpi-blue"><i class="fas fa-coins"></i></div>
+        <div class="kpi-value">{{ fmt(stats.totalRevenue) }}</div>
+        <p class="kpi-label">Revenus totaux</p>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-icon kpi-green"><i class="fas fa-handshake"></i></div>
+        <div class="kpi-value">{{ stats.totalOffersAccepted }}</div>
+        <p class="kpi-label">Offres acceptées</p>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-icon kpi-orange"><i class="fas fa-clock"></i></div>
+        <div class="kpi-value">{{ stats.totalOffersPending }}</div>
+        <p class="kpi-label">En attente</p>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-icon kpi-red"><i class="fas fa-times-circle"></i></div>
+        <div class="kpi-value">{{ stats.totalOffersRejected }}</div>
+        <p class="kpi-label">Offres rejetées</p>
+      </div>
+      @if (stats.monthlyRewardAmount) {
+        <div class="kpi-card">
+          <div class="kpi-icon kpi-purple"><i class="fas fa-coins"></i></div>
+          <div class="kpi-value">{{ fmt(stats.monthlyRewardAmount) }}</div>
+          <p class="kpi-label">Récompense ce mois</p>
+        </div>
+      }
+      @if (stats.rank) {
+        <div class="kpi-card">
+          <div class="kpi-icon kpi-orange"><i class="fas fa-trophy"></i></div>
+          <div class="kpi-value rank-medal" [ngClass]="'rank-' + stats.rank">{{ stats.rank }}</div>
+          <p class="kpi-label">Classement ce mois</p>
+        </div>
+      }
+    </div>
+  }
+
+  @if (!loading) {
+    <div class="dashboard-grid">
+      <!-- My zones -->
+      @if (profile?.regions?.length) {
+        <div class="table-card">
+          <div class="table-header">
+            <h3><i class="fas fa-map-marker-alt"></i> Mes zones</h3>
+            <span class="zone-counter">{{ currentZoneCount }} / {{ MAX_ZONES }}</span>
+          </div>
+          <div style="padding:1rem;">
+            <div class="regions-tags">
+              @for (r of profile!.regions; track r.id) {
+                <div class="zone-tag-row">
+                  <span class="region-tag">
+                    <i class="fas fa-map-pin"></i> {{ r.city ?? r.regionName }}
+                    @if (r.isPremium) {
+                      <span class="zone-badge zone-badge-premium"><i class="fas fa-star"></i> Premium</span>
+                    } @else if (r.isPaid) {
+                      <span class="zone-badge zone-badge-paid"><i class="fas fa-lock-open"></i> Payant</span>
+                    } @else {
+                      <span class="zone-badge zone-badge-free"><i class="fas fa-gift"></i> Gratuit</span>
+                    }
+                  </span>
+                  <button class="btn btn-ghost btn-xs zone-remove-btn" (click)="openRemoveConfirm(r)" title="Supprimer">
+                    <i class="fas fa-times"></i>
+                  </button>
+                </div>
+              }
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- Recent offers -->
+      @if (recentOffers.length > 0) {
+        <div class="table-card">
+          <div class="table-header">
+            <h3><i class="fas fa-file-contract"></i> Dernières offres</h3>
+            <a routerLink="/admin/affiliate-offers" class="btn btn-ghost btn-sm">Voir tout</a>
+          </div>
+          <table class="data-table">
+            <thead><tr><th>Bien</th><th>Prix proposé</th><th>Statut</th><th>Date</th></tr></thead>
+            <tbody>
+              @for (o of recentOffers; track o.id) {
+                <tr>
+                  <td style="font-size:0.8125rem;font-weight:500;">{{ o.propertyTitle }}</td>
+                  <td style="font-size:0.8125rem;color:var(--primary);font-weight:600;">{{ fmt(o.offeredPrice) }}</td>
+                  <td><span class="status-badge" [ngClass]="getStatusClass(o.status)">{{ formatStatus(o.status) }}</span></td>
+                  <td style="font-size:0.775rem;color:var(--text-muted);">{{ formatDate(o.createdAt) }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </div>
+  }
+
+  <!-- Suggested expansion zones -->
+  @if (!loading && suggestedZones.length > 0) {
+    <div class="suggested-zones-section">
+      <div class="section-header-row">
+        <div>
+          <h3 class="section-title"><i class="fas fa-compass"></i> Zones d'expansion suggérées</h3>
+          <p class="section-subtitle">Zones avec des opportunités basées sur l'inventaire et la demande</p>
+        </div>
+        @if (!canAddZone) {
+          <span class="zone-limit-badge"><i class="fas fa-lock"></i> Limite atteinte ({{ MAX_ZONES }}/{{ MAX_ZONES }})</span>
+        }
+      </div>
+      <div class="suggested-zones-grid">
+        @for (z of suggestedZones; track z.zoneName) {
+          <div class="zone-card" [class.zone-card-premium]="z.isPremium" [class.zone-card-disabled]="!canAddZone">
+            <div class="zone-card-header">
+              <div class="zone-name">
+                <i class="fas fa-map-marker-alt"></i>
+                <strong>{{ z.zoneName }}</strong>
+                @if (z.country) { <span class="zone-country">{{ z.country }}</span> }
+              </div>
+              <div class="zone-header-right">
+                <span class="demand-badge" [ngClass]="demandClass(z.demandScore)">{{ demandLabel(z.demandScore) }}</span>
+                @if (z.isPremium) {
+                  <span class="zone-badge zone-badge-premium"><i class="fas fa-star"></i> Premium</span>
+                }
+              </div>
+            </div>
+            <div class="zone-stats">
+              <div class="zone-stat">
+                <span class="zone-stat-value">{{ z.propertyCount }}</span>
+                <span class="zone-stat-label">Biens dispo.</span>
+              </div>
+              <div class="zone-stat">
+                <span class="zone-stat-value">{{ z.averageCommission }}%</span>
+                <span class="zone-stat-label">Commission moy.</span>
+              </div>
+              <div class="zone-stat">
+                <span class="zone-stat-value">{{ z.demandScore }}</span>
+                <span class="zone-stat-label">Ventes actives</span>
+              </div>
+            </div>
+            @if (z.averagePrice > 0) {
+              <div class="zone-avg-price">
+                Prix moyen : <strong>{{ z.averagePrice.toLocaleString('fr-FR') }} TND</strong>
+              </div>
+            }
+            <div class="zone-card-footer">
+              <span class="zone-price-tag" [ngClass]="zonePriceClass(z)">
+                @if (z.price === 0) { <i class="fas fa-gift"></i> Gratuit }
+                @else { <i class="fas fa-credit-card"></i> {{ z.price }} TND }
+              </span>
+              <button class="btn btn-sm"
+                [class.btn-primary]="z.price === 0"
+                [class.btn-success]="z.price > 0 && !z.isPremium"
+                [class.btn-warning]="z.isPremium"
+                [disabled]="!canAddZone"
+                (click)="openPaymentModal(z)">
+                <i class="fas fa-plus"></i>
+                @if (z.price === 0) { Ajouter } @else { Débloquer }
+              </button>
+            </div>
+          </div>
+        }
+      </div>
+    </div>
+  }
+
+  <!-- Quick actions -->
+  @if (!loading) {
+    <div class="quick-actions">
+      <h3 class="section-title"><i class="fas fa-bolt"></i> Actions rapides</h3>
+      <div class="actions-grid">
+        <a routerLink="/admin/affiliate-properties" class="action-card">
+          <div class="action-icon kpi-blue"><i class="fas fa-home"></i></div>
+          <div class="action-label">Biens disponibles</div>
+          <div class="action-sub">Explorer les biens éligibles</div>
+        </a>
+        <a routerLink="/admin/affiliate-offers" class="action-card">
+          <div class="action-icon kpi-green"><i class="fas fa-file-signature"></i></div>
+          <div class="action-label">Soumettre une offre</div>
+          <div class="action-sub">Proposer un acheteur</div>
+        </a>
+        <a routerLink="/admin/affiliate-earnings" class="action-card">
+          <div class="action-icon kpi-purple"><i class="fas fa-coins"></i></div>
+          <div class="action-label">Mes gains</div>
+          <div class="action-sub">Historique des commissions</div>
+        </a>
+        <a routerLink="/admin/affiliate-ranking" class="action-card">
+          <div class="action-icon kpi-orange"><i class="fas fa-trophy"></i></div>
+          <div class="action-label">Classement</div>
+          <div class="action-sub">Voir le leaderboard mensuel</div>
+        </a>
+      </div>
+    </div>
+  }
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     ZONE PAYMENT MODAL (multi-step)
+     ═══════════════════════════════════════════════════════════════════════ -->
+@if (paymentModalOpen && pendingZone) {
+  <div class="modal-overlay" (click)="closePaymentModal()">
+    <div class="modal-box" (click)="$event.stopPropagation()" style="max-width:520px;">
+
+      <!-- ── STEP 1: Payment instructions (paid zones only) ── -->
+      @if (paymentStep === 'instructions') {
+        <div class="modal-header">
+          @if (pendingZone.isPremium) {
+            <h3><i class="fas fa-star text-warning"></i> Zone Premium — Instructions de paiement</h3>
+          } @else {
+            <h3><i class="fas fa-credit-card text-primary"></i> Zone Payante — Instructions de paiement</h3>
+          }
+          <button class="modal-close" (click)="closePaymentModal()"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body">
+          <div class="zone-payment-summary">
+            <div class="zone-payment-icon"><i class="fas fa-map-marker-alt"></i></div>
+            <div class="zone-payment-info">
+              <strong>{{ pendingZone.zoneName }}</strong>
+              @if (pendingZone.country) { <span class="zone-country">{{ pendingZone.country }}</span> }
+            </div>
+          </div>
+
+          <div class="payment-amount-box" [class.payment-premium]="pendingZone.isPremium">
+            <span class="payment-label">Montant à virer</span>
+            <span class="payment-amount">{{ pendingZone.price }} TND</span>
+            @if (pendingZone.isPremium) {
+              <span class="payment-note"><i class="fas fa-star"></i> Zone premium — forte demande</span>
+            }
+          </div>
+
+          <div class="rib-card">
+            <div class="rib-header"><i class="fas fa-university"></i> Coordonnées bancaires</div>
+            <div class="rib-row"><span class="rib-label">Banque</span><span class="rib-value">{{ bankRib.bank }}</span></div>
+            <div class="rib-row"><span class="rib-label">IBAN / RIB</span>
+              <span class="rib-value rib-mono">{{ bankRib.iban }}</span>
+            </div>
+            <div class="rib-row"><span class="rib-label">BIC / SWIFT</span><span class="rib-value rib-mono">{{ bankRib.bic }}</span></div>
+            <div class="rib-row"><span class="rib-label">Bénéficiaire</span><span class="rib-value">{{ bankRib.holder }}</span></div>
+          </div>
+
+          <div class="payment-instruction-notice">
+            <i class="fas fa-info-circle"></i>
+            Effectuez le virement, puis cliquez sur <strong>Suivant</strong> pour envoyer votre preuve de paiement.
+            La zone sera activée après validation par le Super Admin.
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-ghost" (click)="closePaymentModal()">Annuler</button>
+          <button class="btn btn-primary" (click)="nextToUpload()">
+            Suivant <i class="fas fa-arrow-right"></i>
+          </button>
+        </div>
+      }
+
+      <!-- ── STEP 2: Upload proof of payment ── -->
+      @if (paymentStep === 'upload') {
+        <div class="modal-header">
+          <h3><i class="fas fa-upload text-primary"></i>
+            @if (pendingZone.price === 0) { Ajouter la zone } @else { Preuve de paiement }
+          </h3>
+          <button class="modal-close" (click)="closePaymentModal()"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body">
+          <div class="zone-payment-summary">
+            <div class="zone-payment-icon"><i class="fas fa-map-marker-alt"></i></div>
+            <div class="zone-payment-info">
+              <strong>{{ pendingZone.zoneName }}</strong>
+              @if (pendingZone.price > 0) {
+                <span class="zone-price-tag" [ngClass]="zonePriceClass(pendingZone)">{{ pendingZone.price }} TND</span>
+              }
+            </div>
+          </div>
+
+          @if (pendingZone.price > 0) {
+            <p class="upload-instructions">
+              <i class="fas fa-camera"></i>
+              Téléchargez une capture d'écran ou photo de votre virement bancaire (PNG, JPG, PDF — max 5 Mo).
+            </p>
+          } @else {
+            <p class="upload-instructions">
+              <i class="fas fa-gift"></i>
+              Votre première zone est <strong>gratuite</strong> ! Confirmez l'ajout ci-dessous.
+            </p>
+          }
+
+          @if (pendingZone.price > 0) {
+            <div class="file-upload-area" [class.has-file]="proofFile">
+              <input type="file" id="proofInput" accept="image/*,.pdf"
+                     (change)="onProofSelected($event)" style="display:none">
+              <label for="proofInput" class="file-upload-label">
+                @if (!proofFile) {
+                  <i class="fas fa-cloud-upload-alt"></i>
+                  <span>Cliquez pour sélectionner un fichier</span>
+                  <small>PNG, JPG, PDF — max 5 Mo</small>
+                } @else {
+                  <i class="fas fa-check-circle text-success"></i>
+                  <span>{{ proofFile.name }}</span>
+                  <small>{{ (proofFile.size / 1024).toFixed(0) }} Ko — cliquez pour changer</small>
+                }
+              </label>
+            </div>
+
+            @if (proofPreviewUrl && proofFile?.type?.startsWith('image/')) {
+              <div class="proof-preview">
+                <img [src]="proofPreviewUrl" alt="Aperçu preuve de paiement">
+              </div>
+            }
+          }
+
+          @if (paymentError) {
+            <div class="alert alert-danger" style="margin-top:0.75rem;font-size:0.8rem;">
+              <i class="fas fa-exclamation-circle"></i> {{ paymentError }}
+            </div>
+          }
+        </div>
+        <div class="modal-footer">
+          @if (pendingZone.price > 0) {
+            <button class="btn btn-ghost" (click)="paymentStep = 'instructions'">
+              <i class="fas fa-arrow-left"></i> Retour
+            </button>
+          } @else {
+            <button class="btn btn-ghost" (click)="closePaymentModal()">Annuler</button>
+          }
+          <button class="btn btn-primary"
+            [disabled]="paymentLoading || (pendingZone.price > 0 && !proofFile)"
+            (click)="submitPaymentRequest()">
+            @if (paymentLoading) {
+              <i class="fas fa-spinner fa-spin"></i> Envoi…
+            } @else if (pendingZone.price === 0) {
+              <i class="fas fa-plus"></i> Ajouter
+            } @else {
+              <i class="fas fa-paper-plane"></i> Soumettre la demande
+            }
+          </button>
+        </div>
+      }
+
+      <!-- ── STEP 3: Confirmation ── -->
+      @if (paymentStep === 'submitted') {
+        <div class="modal-header">
+          <h3><i class="fas fa-check-circle text-success"></i>
+            @if (pendingZone!.price === 0) { Zone ajoutée ! } @else { Demande envoyée ! }
+          </h3>
+          <button class="modal-close" (click)="closePaymentModal()"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body" style="text-align:center;padding:2rem 1.5rem;">
+          <div class="success-icon-lg"><i class="fas fa-map-marker-alt"></i></div>
+          @if (pendingZone!.price === 0) {
+            <h4>{{ pendingZone!.zoneName }} activée</h4>
+            <p style="color:var(--text-muted);font-size:0.875rem;">
+              Vous avez maintenant accès aux biens disponibles dans cette zone.
+            </p>
+          } @else {
+            <h4>Demande en cours de validation</h4>
+            <p style="color:var(--text-muted);font-size:0.875rem;">
+              Votre preuve de paiement pour <strong>{{ pendingZone!.zoneName }}</strong> a bien été reçue.
+              Le Super Admin va la valider sous peu. Vous recevrez une notification à l'activation.
+            </p>
+            <div class="submitted-steps">
+              <div class="submitted-step done"><i class="fas fa-check"></i> Virement effectué</div>
+              <div class="submitted-step done"><i class="fas fa-check"></i> Preuve envoyée</div>
+              <div class="submitted-step pending"><i class="fas fa-hourglass-half"></i> Validation Super Admin</div>
+              <div class="submitted-step pending"><i class="fas fa-map-marker-alt"></i> Zone activée</div>
+            </div>
+          }
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-primary" (click)="closePaymentModal()">Fermer</button>
+        </div>
+      }
+
+    </div>
+  </div>
+}
+
+<!-- Remove zone confirmation -->
+@if (removeConfirmOpen && zoneToRemove) {
+  <div class="modal-overlay" (click)="closeRemoveConfirm()">
+    <div class="modal-box modal-sm" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3><i class="fas fa-trash text-danger"></i> Supprimer la zone</h3>
+        <button class="modal-close" (click)="closeRemoveConfirm()"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="modal-body">
+        <p>Voulez-vous supprimer la zone <strong>{{ zoneToRemove.city ?? zoneToRemove.regionName }}</strong> ?</p>
+        @if (zoneToRemove.isPaid) {
+          <div class="alert alert-warning" style="font-size:0.8rem;">
+            <i class="fas fa-exclamation-triangle"></i>
+            Cette zone a été payée ({{ zoneToRemove.pricePaid }} TND). Aucun remboursement n'est prévu.
+          </div>
+        }
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" (click)="closeRemoveConfirm()">Annuler</button>
+        <button class="btn btn-danger" (click)="confirmRemoveZone()" [disabled]="removeLoading">
+          @if (removeLoading) { <i class="fas fa-spinner fa-spin"></i> } @else { <i class="fas fa-trash"></i> }
+          Supprimer
+        </button>
+      </div>
+    </div>
+  </div>
+}

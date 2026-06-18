@@ -1,0 +1,153 @@
+<div class="page-wrapper">
+  <div class="page-header">
+    <div class="page-header-left">
+      <h2><i class="fas fa-trophy"></i> Classement Mensuel Affiliés</h2>
+      <p class="page-subtitle">Les meilleurs affiliés reçoivent une récompense mensuelle fixe</p>
+    </div>
+    <div class="page-header-right">
+      <button class="btn btn-outline" (click)="load()">
+        <i class="fas fa-sync-alt"></i> Actualiser
+      </button>
+    </div>
+  </div>
+
+  <!-- Reward info banner -->
+  <div class="alert alert-info" style="cursor:default;">
+    <i class="fas fa-coins"></i>
+    <span>
+      <strong>Récompenses mensuelles :</strong>
+      &nbsp;🥇 1er → <strong>2 000 TND</strong>
+      &nbsp;|&nbsp; 🥈 2ème → <strong>1 500 TND</strong>
+      &nbsp;|&nbsp; 🥉 3ème → <strong>1 000 TND</strong>
+      &nbsp;— versées par le Super Admin chaque mois
+    </span>
+  </div>
+
+  @if (errorMessage) {
+    <div class="alert alert-danger">
+      <i class="fas fa-exclamation-circle"></i> {{ errorMessage }}
+    </div>
+  }
+
+  @if (loading) {
+    <div class="loading-state">
+      <i class="fas fa-spinner fa-spin"></i><span>Chargement du classement…</span>
+    </div>
+  }
+
+  @if (!loading && ranking.length === 0) {
+    <div class="empty-state">
+      <i class="fas fa-trophy fa-3x"></i>
+      <h3>Aucune donnée de classement</h3>
+      <p>Le classement se calcule sur les commissions générées ce mois-ci.</p>
+    </div>
+  }
+
+  <!-- Top 3 podium -->
+  @if (!loading && ranking.length >= 3) {
+    <div class="podium-section">
+      <div class="podium">
+        <!-- Rank 2 -->
+        @if (ranking[1]) {
+          <div class="podium-card rank-2-card">
+            <div class="podium-medal rank-2">2</div>
+            <div class="podium-avatar">{{ ranking[1].affiliateName.charAt(0).toUpperCase() }}</div>
+            <div class="podium-name">{{ ranking[1].affiliateName }}</div>
+            <div class="podium-revenue">{{ formatCommission(ranking[1].totalRevenue) }}</div>
+            <div class="podium-bonus bonus-badge reward-badge"><i class="fas fa-coins"></i> 1 500 TND</div>
+            <div class="podium-bar bar-2"></div>
+          </div>
+        }
+        <!-- Rank 1 -->
+        @if (ranking[0]) {
+          <div class="podium-card rank-1-card">
+            <div class="podium-crown"><i class="fas fa-crown text-warning"></i></div>
+            <div class="podium-medal rank-1">1</div>
+            <div class="podium-avatar">{{ ranking[0].affiliateName.charAt(0).toUpperCase() }}</div>
+            <div class="podium-name">{{ ranking[0].affiliateName }}</div>
+            <div class="podium-revenue">{{ formatCommission(ranking[0].totalRevenue) }}</div>
+            <div class="podium-bonus bonus-badge reward-badge"><i class="fas fa-coins"></i> 2 000 TND</div>
+            <div class="podium-bar bar-1"></div>
+          </div>
+        }
+        <!-- Rank 3 -->
+        @if (ranking[2]) {
+          <div class="podium-card rank-3-card">
+            <div class="podium-medal rank-3">3</div>
+            <div class="podium-avatar">{{ ranking[2].affiliateName.charAt(0).toUpperCase() }}</div>
+            <div class="podium-name">{{ ranking[2].affiliateName }}</div>
+            <div class="podium-revenue">{{ formatCommission(ranking[2].totalRevenue) }}</div>
+            <div class="podium-bonus bonus-badge reward-badge"><i class="fas fa-coins"></i> 1 000 TND</div>
+            <div class="podium-bar bar-3"></div>
+          </div>
+        }
+      </div>
+    </div>
+  }
+
+  <!-- Full ranking table -->
+  @if (!loading && ranking.length > 0) {
+    <div class="table-card">
+      <div class="table-header">
+        <h3><i class="fas fa-list-ol"></i> Classement complet</h3>
+      </div>
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Rang</th>
+            <th>Affilié</th>
+            <th>Zones</th>
+            <th>Offres acceptées</th>
+            <th>Commissions totales</th>
+            <th>Récompense mensuelle</th>
+            <th>Statut</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (a of ranking; track a.affiliateId; let i = $index) {
+            <tr [class.podium-row]="i < 3">
+              <td>
+                <span class="rank-medal" [ngClass]="getRankClass(i + 1)">{{ i + 1 }}</span>
+              </td>
+              <td>
+                <div style="display:flex;align-items:center;gap:0.5rem;">
+                  <div class="avatar-circle" style="width:32px;height:32px;font-size:0.8rem;">
+                    {{ a.affiliateName.charAt(0).toUpperCase() }}
+                  </div>
+                  <div>
+                    <div style="font-weight:600;font-size:0.875rem;">{{ a.affiliateName }}</div>
+                    <div style="font-size:0.775rem;color:var(--text-muted);">&nbsp;</div>
+                  </div>
+                </div>
+              </td>
+              <td>
+                <div class="regions-tags">
+                  @for (r of a.regions; track r.id) {
+                    <span class="region-tag">{{ r.regionName }}</span>
+                  }
+                  @if (!a.regions?.length) {
+                    <span class="text-muted" style="font-size:0.8rem;">—</span>
+                  }
+                </div>
+              </td>
+              <td style="font-weight:600;">{{ a.totalOffersAccepted }}</td>
+              <td style="font-weight:700;color:var(--primary);">{{ formatCommission(a.totalRevenue) }}</td>
+              <td>
+                @if (i < 3) {
+                  <span class="bonus-badge reward-badge">
+                    <i class="fas fa-coins"></i> {{ getRewardForRank(i + 1) }}
+                  </span>
+                } @else {
+                  <span class="text-muted" style="font-size:0.8rem;">—</span>
+                }
+              </td>
+              <td>
+                <span class="status-badge status-active">Actif</span>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</div>

@@ -1,0 +1,112 @@
+<section class="share-requests-page">
+
+  <header class="sr-header">
+    <div>
+      <p class="sr-eyebrow">Super Admin</p>
+      <h2>Demandes de partage envoyées</h2>
+      <p class="sr-subtext">Suivez l'état des partages de propriétés vers les agences.</p>
+    </div>
+  </header>
+
+  <!-- Stat pills -->
+  <div class="sr-stats">
+    <button class="sr-stat" [class.active]="statusFilter === ''" (click)="statusFilter = ''; applyFilter()">
+      <span class="stat-count">{{ counts.all }}</span>
+      <span class="stat-label">Total</span>
+    </button>
+    <button class="sr-stat pending" [class.active]="statusFilter === 'PENDING'" (click)="statusFilter = 'PENDING'; applyFilter()">
+      <span class="stat-count">{{ counts.pending }}</span>
+      <span class="stat-label">En attente</span>
+    </button>
+    <button class="sr-stat accepted" [class.active]="statusFilter === 'ACCEPTED'" (click)="statusFilter = 'ACCEPTED'; applyFilter()">
+      <span class="stat-count">{{ counts.accepted }}</span>
+      <span class="stat-label">Acceptées</span>
+    </button>
+    <button class="sr-stat rejected" [class.active]="statusFilter === 'REJECTED'" (click)="statusFilter = 'REJECTED'; applyFilter()">
+      <span class="stat-count">{{ counts.rejected }}</span>
+      <span class="stat-label">Refusées</span>
+    </button>
+    <button class="sr-stat cancelled" [class.active]="statusFilter === 'CANCELLED'" (click)="statusFilter = 'CANCELLED'; applyFilter()">
+      <span class="stat-count">{{ counts.cancelled }}</span>
+      <span class="stat-label">Annulées</span>
+    </button>
+  </div>
+
+  <!-- States -->
+  <div *ngIf="loading" class="sr-state">
+    <div class="spinner"></div>
+    <p>Chargement...</p>
+  </div>
+  <div *ngIf="!loading && errorMessage" class="sr-state error">
+    <i class="fas fa-triangle-exclamation"></i>
+    <p>{{ errorMessage }}</p>
+  </div>
+  <div *ngIf="!loading && !errorMessage && filtered.length === 0" class="sr-state empty">
+    <i class="fas fa-paper-plane"></i>
+    <p>Aucune demande.</p>
+  </div>
+
+  <!-- Table -->
+  <div class="sr-table-wrap" *ngIf="!loading && !errorMessage && filtered.length > 0">
+    <table class="sr-table">
+      <thead>
+        <tr>
+          <th>Propriété</th>
+          <th>Agence</th>
+          <th>Commission</th>
+          <th>Revenu estimé</th>
+          <th>Statut</th>
+          <th>Date envoi</th>
+          <th>Réponse le</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let r of filtered">
+          <td>
+            <div class="td-property">
+              <img *ngIf="r.propertyMainImageUrl" [src]="r.propertyMainImageUrl" [alt]="r.propertyTitle" class="prop-thumb" (error)="$any($event.target).style.display='none'" />
+              <div>
+                <strong>{{ r.propertyTitle }}</strong>
+                <small>{{ r.propertyCity }}{{ r.propertyCountry ? ', ' + r.propertyCountry : '' }}</small>
+                <small class="prop-price">{{ formatPrice(r) }}</small>
+              </div>
+            </div>
+          </td>
+          <td>
+            <div class="td-agency">
+              <strong>{{ r.agencyAdminName }}</strong>
+            </div>
+          </td>
+          <td><span class="commission-badge">{{ formatCommission(r) }}</span></td>
+          <td><span class="revenue-value">{{ formatRevenue(r) }}</span></td>
+          <td><span class="status-badge" [ngClass]="statusClass(r.status)">{{ statusLabel(r.status) }}</span></td>
+          <td>{{ formatDate(r.createdAt) }}</td>
+          <td>{{ formatDate(r.respondedAt) }}</td>
+          <td>
+            <div class="td-actions">
+              <a class="btn-sm-outline" [routerLink]="['/admin/properties/edit', r.propertyId]" title="Voir la propriété">
+                <i class="fas fa-eye"></i>
+              </a>
+              <button *ngIf="r.status === 'PENDING'" class="btn-sm-danger" (click)="cancel(r)" title="Annuler">
+                <i class="fas fa-ban"></i>
+              </button>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Rejection reasons panel -->
+  <div class="sr-rejections" *ngIf="!loading && counts.rejected > 0">
+    <h3><i class="fas fa-circle-xmark"></i> Raisons de refus</h3>
+    <ul>
+      <li *ngFor="let r of requests" [hidden]="r.status !== 'REJECTED' || !r.rejectionReason">
+        <strong>{{ r.propertyTitle }}</strong> → <em>{{ r.agencyAdminName }}</em>:
+        <span>{{ r.rejectionReason || 'Non précisée' }}</span>
+      </li>
+    </ul>
+  </div>
+
+</section>

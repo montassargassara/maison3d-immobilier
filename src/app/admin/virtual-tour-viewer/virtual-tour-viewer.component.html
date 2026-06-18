@@ -1,0 +1,114 @@
+<div
+  #viewerEl
+  class="vtv-shell"
+  [class.vtv-fullscreen]="isFullscreen"
+  [class.vtv-controls-hidden]="isFullscreen && !showControls"
+  tabindex="0"
+  (mousemove)="onMouseMove()"
+  (mousedown)="onMouseDown($event)"
+  (mouseup)="onMouseUp($event)"
+  (touchstart)="onTouchStart($event)"
+  (touchend)="onTouchEnd($event)">
+
+  <!-- Loading skeleton -->
+  <div class="vtv-loading" *ngIf="!imageLoaded">
+    <div class="vtv-loading-spinner">
+      <i class="fas fa-spinner fa-spin"></i>
+    </div>
+    <span>Chargement de la scène…</span>
+  </div>
+
+  <!-- Main scene image -->
+  <div class="vtv-scene" [class.vtv-transition]="isTransitioning">
+    <img
+      *ngIf="currentScene"
+      [src]="currentScene.imageUrl"
+      [alt]="currentScene.sceneName"
+      class="vtv-scene-img"
+      [class.vtv-img-visible]="imageLoaded"
+      (load)="onImageLoad()"
+      draggable="false">
+  </div>
+
+  <!-- Gradient overlays -->
+  <div class="vtv-gradient-top"></div>
+  <div class="vtv-gradient-bottom"></div>
+
+  <!-- Top bar -->
+  <div class="vtv-topbar">
+    <div class="vtv-topbar-left">
+      <div class="vtv-vr-badge">
+        <i class="fas fa-vr-cardboard"></i>
+        <span>Visite Virtuelle</span>
+      </div>
+      <span class="vtv-scene-name" *ngIf="currentScene">{{ currentScene.sceneName }}</span>
+    </div>
+    <div class="vtv-topbar-right">
+      <span class="vtv-counter">{{ currentIndex + 1 }} / {{ scenes.length }}</span>
+      <button class="vtv-ctrl-btn" type="button" (click)="toggleAutoplay()" [title]="isAutoplay ? 'Pause' : 'Autoplay'">
+        <i class="fas" [class.fa-pause]="isAutoplay" [class.fa-play]="!isAutoplay"></i>
+      </button>
+      <button class="vtv-ctrl-btn" type="button" (click)="toggleFullscreen()" [title]="isFullscreen ? 'Quitter plein écran' : 'Plein écran'">
+        <i class="fas" [class.fa-compress]="isFullscreen" [class.fa-expand]="!isFullscreen"></i>
+      </button>
+    </div>
+  </div>
+
+  <!-- Left arrow -->
+  <button
+    class="vtv-nav vtv-nav-prev"
+    type="button"
+    (click)="prev()"
+    [disabled]="scenes.length <= 1"
+    title="Scène précédente">
+    <i class="fas fa-chevron-left"></i>
+  </button>
+
+  <!-- Right arrow -->
+  <button
+    class="vtv-nav vtv-nav-next"
+    type="button"
+    (click)="next()"
+    [disabled]="scenes.length <= 1"
+    title="Scène suivante">
+    <i class="fas fa-chevron-right"></i>
+  </button>
+
+  <!-- Bottom: dot indicators + thumbnail strip -->
+  <div class="vtv-bottom">
+
+    <!-- Dot indicators -->
+    <div class="vtv-dots">
+      <button
+        *ngFor="let scene of scenes; let i = index"
+        class="vtv-dot"
+        [class.vtv-dot-active]="i === currentIndex"
+        type="button"
+        (click)="goToScene(i)"
+        [title]="sceneLabel(i)">
+      </button>
+    </div>
+
+    <!-- Thumbnail strip (shown when ≥ 4 scenes) -->
+    <div class="vtv-thumb-strip" *ngIf="scenes.length >= 4">
+      <button
+        *ngFor="let scene of scenes; let i = index"
+        class="vtv-thumb-item"
+        [class.vtv-thumb-active]="i === currentIndex"
+        type="button"
+        (click)="goToScene(i)">
+        <img
+          [src]="scene.thumbnailUrl || scene.imageUrl"
+          [alt]="scene.sceneName"
+          loading="lazy">
+        <span>{{ scene.sceneName }}</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Keyboard hint (shown briefly) -->
+  <div class="vtv-kbd-hint" *ngIf="!isFullscreen">
+    <span><i class="fas fa-keyboard"></i> ← → pour naviguer &nbsp;·&nbsp; F pour plein écran &nbsp;·&nbsp; Espace pour autoplay</span>
+  </div>
+
+</div>

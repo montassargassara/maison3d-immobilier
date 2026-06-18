@@ -1,0 +1,238 @@
+<div class="register-page">
+  <div class="register-container">
+
+    @if (submitted) {
+      <div class="success-card">
+        <div class="success-icon">
+          <i class="fas fa-check-circle"></i>
+        </div>
+        <h2>Candidature envoyée !</h2>
+        <p>
+          Votre candidature a bien été reçue. Notre équipe va l'examiner et vous contactera
+          par e-mail pour vous informer de la décision.
+        </p>
+        <a class="btn-back" routerLink="/register">Retour aux options d'inscription</a>
+      </div>
+    } @else {
+      <div class="register-header">
+        <div class="register-header-icon affiliate">
+          <i class="fas fa-handshake"></i>
+        </div>
+        <h1>Devenir Affilié commercial</h1>
+        <p>Rejoignez notre réseau de commerciaux indépendants et gagnez des commissions sur chaque vente.</p>
+      </div>
+
+      <form class="register-form" (ngSubmit)="submit()" #f="ngForm" novalidate>
+
+        @if (errorMessage) {
+          <div class="form-error-banner">
+            <i class="fas fa-exclamation-triangle"></i> {{ errorMessage }}
+          </div>
+        }
+
+        <!-- Section : Identité -->
+        <div class="form-section">
+          <h3 class="section-title">
+            <i class="fas fa-user"></i> Informations personnelles
+          </h3>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="nom">Nom <span class="required">*</span></label>
+              <input
+                id="nom"
+                type="text"
+                [(ngModel)]="form.nom"
+                name="nom"
+                required
+                minlength="2"
+                placeholder="Votre nom"
+                #nom="ngModel"
+              />
+              @if (nom.invalid && nom.touched) {
+                <span class="field-error">Le nom est requis (min. 2 caractères).</span>
+              }
+            </div>
+            <div class="form-group">
+              <label for="prenom">Prénom <span class="required">*</span></label>
+              <input
+                id="prenom"
+                type="text"
+                [(ngModel)]="form.prenom"
+                name="prenom"
+                required
+                minlength="2"
+                placeholder="Votre prénom"
+                #prenom="ngModel"
+              />
+              @if (prenom.invalid && prenom.touched) {
+                <span class="field-error">Le prénom est requis (min. 2 caractères).</span>
+              }
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="telephone">Téléphone</label>
+              <input
+                id="telephone"
+                type="tel"
+                [(ngModel)]="form.telephone"
+                name="telephone"
+                placeholder="+216 XX XXX XXX"
+              />
+            </div>
+            <div class="form-group">
+              <label for="experienceLevel">Niveau d'expérience</label>
+              <select id="experienceLevel" [(ngModel)]="form.experienceLevel" name="experienceLevel">
+                <option value="">-- Sélectionner --</option>
+                <option value="JUNIOR">Junior (0–2 ans)</option>
+                <option value="MID">Intermédiaire (2–5 ans)</option>
+                <option value="SENIOR">Senior (5–10 ans)</option>
+                <option value="EXPERT">Expert (10+ ans)</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="notes">Présentation / motivations (optionnel)</label>
+            <textarea
+              id="notes"
+              [(ngModel)]="form.notes"
+              name="notes"
+              rows="3"
+              placeholder="Parlez-nous de votre parcours, de votre zone d'intervention souhaitée…"
+            ></textarea>
+          </div>
+        </div>
+
+        <!-- Section : Zone -->
+        <div class="form-section">
+          <h3 class="section-title">
+            <i class="fas fa-map-marker-alt"></i> Zone d'intervention <span class="required">*</span>
+          </h3>
+          <p class="section-hint">
+            Sélectionnez le pays et la ville où vous souhaitez opérer. Vous pourrez ajouter d'autres zones
+            depuis votre tableau de bord après activation.
+          </p>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="country">Pays <span class="required">*</span></label>
+              <select
+                id="country"
+                [(ngModel)]="selectedCountry"
+                name="country"
+                required
+                (change)="onCountryChange()"
+                #countryRef="ngModel"
+              >
+                <option value="">-- Sélectionner un pays --</option>
+                @for (c of countries; track c) {
+                  <option [value]="c">{{ c }}</option>
+                }
+              </select>
+              @if (countryRef.invalid && countryRef.touched) {
+                <span class="field-error">Le pays est requis.</span>
+              }
+            </div>
+            <div class="form-group">
+              <label for="city">Ville <span class="required">*</span></label>
+              <select
+                id="city"
+                [(ngModel)]="selectedCity"
+                name="city"
+                required
+                [disabled]="!selectedCountry"
+                #cityRef="ngModel"
+              >
+                <option value="">-- Sélectionner une ville --</option>
+                @for (c of cities; track c) {
+                  <option [value]="c">{{ c }}</option>
+                }
+              </select>
+              @if (cityRef.invalid && cityRef.touched) {
+                <span class="field-error">La ville est requise.</span>
+              }
+            </div>
+          </div>
+          @if (zoneLabel) {
+            <div class="zone-badge">
+              <i class="fas fa-map-pin"></i> Zone sélectionnée : <strong>{{ zoneLabel }}</strong>
+            </div>
+          }
+        </div>
+
+        <!-- Section : Compte -->
+        <div class="form-section">
+          <h3 class="section-title">
+            <i class="fas fa-lock"></i> Accès au compte
+          </h3>
+          <div class="form-group">
+            <label for="email">Adresse e-mail <span class="required">*</span></label>
+            <input
+              id="email"
+              type="email"
+              [(ngModel)]="form.email"
+              name="email"
+              required
+              email
+              placeholder="votre@email.com"
+              #email="ngModel"
+            />
+            @if (email.invalid && email.touched) {
+              <span class="field-error">Adresse e-mail invalide.</span>
+            }
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="password">Mot de passe <span class="required">*</span></label>
+              <input
+                id="password"
+                type="password"
+                [(ngModel)]="form.password"
+                name="password"
+                required
+                minlength="6"
+                placeholder="Min. 6 caractères"
+                #password="ngModel"
+              />
+              @if (password.invalid && password.touched) {
+                <span class="field-error">Mot de passe requis (min. 6 caractères).</span>
+              }
+            </div>
+            <div class="form-group">
+              <label for="confirmPassword">Confirmer le mot de passe <span class="required">*</span></label>
+              <input
+                id="confirmPassword"
+                type="password"
+                [(ngModel)]="confirmPassword"
+                name="confirmPassword"
+                required
+                placeholder="Répétez le mot de passe"
+              />
+              @if (passwordMismatch) {
+                <span class="field-error">Les mots de passe ne correspondent pas.</span>
+              }
+            </div>
+          </div>
+        </div>
+
+        <button
+          type="submit"
+          class="submit-btn"
+          [disabled]="loading || f.invalid || passwordMismatch || !selectedCountry || !selectedCity"
+        >
+          @if (loading) {
+            <span class="spinner"></span> Envoi en cours…
+          } @else {
+            <i class="fas fa-paper-plane"></i> Soumettre ma candidature
+          }
+        </button>
+
+      </form>
+
+      <p class="form-footer">
+        Vous avez déjà un compte ?
+        <a routerLink="/admin/login">Se connecter</a>
+      </p>
+    }
+
+  </div>
+</div>

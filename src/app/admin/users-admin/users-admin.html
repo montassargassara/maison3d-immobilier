@@ -1,0 +1,415 @@
+<!-- admin/users-admin/users-admin.html -->
+<div class="users-admin-container">
+  <!-- Header -->
+  <div class="users-header">
+    <div class="header-left">
+      <h1><i class="fas fa-users me-2"></i> Gestion des utilisateurs</h1>
+      <p class="text-muted">Gérez les utilisateurs de votre plateforme</p>
+    </div>
+    <div class="header-right">
+      <button class="btn btn-primary" (click)="openCreateModal()">
+        <i class="fas fa-user-plus me-2"></i> Nouvel utilisateur
+      </button>
+    </div>
+  </div>
+
+  <!-- Messages -->
+  <div *ngIf="errorMessage" class="alert alert-danger alert-dismissible fade show">
+    <i class="fas fa-exclamation-circle me-2"></i>
+    {{ errorMessage }}
+    <button type="button" class="btn-close" (click)="errorMessage = ''"></button>
+  </div>
+
+  <div *ngIf="successMessage" class="alert alert-success alert-dismissible fade show">
+    <i class="fas fa-check-circle me-2"></i>
+    {{ successMessage }}
+    <button type="button" class="btn-close" (click)="successMessage = ''"></button>
+  </div>
+
+  <!-- Statistiques -->
+  <div class="stats-section">
+    <div class="row">
+      <div class="col-md-3">
+        <div class="stat-card bg-primary">
+          <div class="stat-icon">
+            <i class="fas fa-users"></i>
+          </div>
+          <div class="stat-info">
+            <h3>{{ stats.total }}</h3>
+            <p>Total utilisateurs</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="stat-card bg-success">
+          <div class="stat-icon">
+            <i class="fas fa-user-check"></i>
+          </div>
+          <div class="stat-info">
+            <h3>{{ stats.active }}</h3>
+            <p>Utilisateurs actifs</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="stat-card bg-warning">
+          <div class="stat-icon">
+            <i class="fas fa-user-slash"></i>
+          </div>
+          <div class="stat-info">
+            <h3>{{ stats.inactive }}</h3>
+            <p>Utilisateurs inactifs</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="stat-card bg-info">
+          <div class="stat-icon">
+            <i class="fas fa-user-tie"></i>
+          </div>
+          <div class="stat-info">
+            <h3>{{ stats.rolesCount['COMMERCIAL'] || 0 }}</h3>
+            <p>Commerciaux</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filtres et recherche -->
+  <div class="filters-section card mb-4">
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-md-4">
+          <div class="input-group">
+            <span class="input-group-text">
+              <i class="fas fa-search"></i>
+            </span>
+            <input type="text" class="form-control" 
+                   [(ngModel)]="searchTerm" 
+                   (ngModelChange)="applyFilters()"
+                   placeholder="Rechercher un utilisateur...">
+          </div>
+        </div>
+        <div class="col-md-3">
+          <select class="form-select" [(ngModel)]="roleFilter" (ngModelChange)="applyFilters()">
+            <option value="">Tous les rôles</option>
+            <option value="SUPER_ADMIN">Super Admin</option>
+            <option value="ADMIN">Administrateur</option>
+            <option value="RESPONSABLE_COMMERCIAL">Resp. Commercial</option>
+            <option value="COMMERCIAL">Commercial</option>
+            <option value="CLIENT">Client</option>
+            <option value="AFFILIATE">Affilié</option>
+          </select>
+        </div>
+        <div class="col-md-3">
+          <select class="form-select" [(ngModel)]="statusFilter" (ngModelChange)="applyFilters()">
+            <option value="">Tous les statuts</option>
+            <option value="active">Actifs</option>
+            <option value="inactive">Inactifs</option>
+          </select>
+        </div>
+        <div class="col-md-2">
+          <select class="form-select" [(ngModel)]="pageSize" (ngModelChange)="page = 1">
+            <option value="10">10 / page</option>
+            <option value="25">25 / page</option>
+            <option value="50">50 / page</option>
+            <option value="100">100 / page</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tableau des utilisateurs -->
+  <div class="table-section card">
+    <div class="card-body">
+      <div class="table-responsive" *ngIf="!loading; else loadingTemplate">
+        <table class="table table-hover">
+          <thead>
+            <tr>
+              <th (click)="sort('prenom')" style="cursor: pointer; width: 30%">
+                Utilisateur
+                <i [class]="getSortIcon('prenom')" class="ms-1"></i>
+              </th>
+              <th (click)="sort('email')" style="cursor: pointer;">
+                Email
+                <i [class]="getSortIcon('email')" class="ms-1"></i>
+              </th>
+              <th (click)="sort('role')" style="cursor: pointer;">
+                Rôle
+                <i [class]="getSortIcon('role')" class="ms-1"></i>
+              </th>
+              <th (click)="sort('createdAt')" style="cursor: pointer;">
+                Date d'inscription
+                <i [class]="getSortIcon('createdAt')" class="ms-1"></i>
+              </th>
+              <th (click)="sort('isActive')" style="cursor: pointer;">
+                Statut
+                <i [class]="getSortIcon('isActive')" class="ms-1"></i>
+              </th>
+              <th class="text-end">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngIf="paginatedUsers.length === 0">
+              <td colspan="6" class="text-center text-muted py-4">
+                <i class="fas fa-users fa-2x mb-2"></i>
+                <p class="mb-0">Aucun utilisateur trouvé</p>
+              </td>
+            </tr>
+            <tr *ngFor="let user of paginatedUsers">
+              <td>
+                <div class="d-flex align-items-center">
+                  <div class="user-avatar me-3" [style.background-color]="getRoleColor(user.role)">
+                    {{ getInitials(user.prenom, user.nom) }}
+                  </div>
+                  <div>
+                    <strong>{{ user.prenom }} {{ user.nom }}</strong>
+                    <div class="text-muted small">{{ user.telephone || 'Non renseigné' }}</div>
+                  </div>
+                </div>
+              </td>
+              <td class="align-middle">
+                <div class="text-truncate" style="max-width: 200px;">
+                  {{ user.email }}
+                </div>
+              </td>
+              <td class="align-middle">
+                <span class="badge" [style.background-color]="getRoleColor(user.role)">
+                  {{ getRoleText(user.role) }}
+                </span>
+              </td>
+              <td class="align-middle">
+                <div class="text-muted small">
+                  {{ formatDate(user.createdAt) }}
+                </div>
+              </td>
+              <td class="align-middle">
+                <span class="badge" [ngClass]="{'bg-success': user.isActive, 'bg-danger': !user.isActive}">
+                  {{ user.isActive ? 'Actif' : 'Inactif' }}
+                </span>
+              </td>
+              <td class="align-middle text-end">
+                <div class="btn-group">
+                  <button class="btn btn-sm btn-outline-primary" (click)="openEditModal(user)">
+                    <i class="fas fa-edit"></i>
+                  </button>
+                  <button type="button" class="btn btn-sm btn-outline-primary dropdown-toggle dropdown-toggle-split" 
+                          (click)="toggleDropdown($event, 'dropdown-' + user.id)">
+                  </button>
+                  <div class="dropdown-menu dropdown-menu-end" [id]="'dropdown-' + user.id">
+                    <button class="dropdown-item" (click)="openPasswordModal(user)">
+                      <i class="fas fa-key me-2"></i> Changer mot de passe
+                    </button>
+                    <button class="dropdown-item" (click)="toggleUserStatus(user)">
+                      <i class="fas" [class.fa-user-check]="!user.isActive" [class.fa-user-slash]="user.isActive" class="me-2"></i>
+                      {{ user.isActive ? 'Désactiver' : 'Activer' }}
+                    </button>
+                    <div class="dropdown-divider"></div>
+                    <button class="dropdown-item text-danger" (click)="deleteUser(user)">
+                      <i class="fas fa-trash-alt me-2"></i> Supprimer
+                    </button>
+                  </div>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <ng-template #loadingTemplate>
+        <div class="text-center py-5">
+          <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Chargement...</span>
+          </div>
+          <p class="mt-3">Chargement des utilisateurs...</p>
+        </div>
+      </ng-template>
+
+      <!-- Pagination -->
+      <div class="d-flex justify-content-between align-items-center mt-3" *ngIf="!loading">
+        <div class="text-muted">
+          Affichage de {{ (page - 1) * pageSize + 1 }} à 
+          {{ (page * pageSize) > collectionSize ? collectionSize : page * pageSize }} sur {{ collectionSize }} utilisateurs
+        </div>
+        <div>
+          <button class="btn btn-sm btn-outline-secondary me-2" (click)="page = page - 1" [disabled]="page === 1">
+            Précédent
+          </button>
+          <span class="mx-2">Page {{ page }} / {{ Math.ceil(collectionSize / pageSize) || 1 }}</span>
+          <button class="btn btn-sm btn-outline-secondary" (click)="page = page + 1" [disabled]="page === Math.ceil(collectionSize / pageSize) || collectionSize === 0">
+            Suivant
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Création -->
+<div class="modal fade" tabindex="-1" #createModal>
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h4 class="modal-title"><i class="fas fa-user-plus me-2"></i>Nouvel utilisateur</h4>
+        <button type="button" class="btn-close" (click)="closeCreateModal()"></button>
+      </div>
+      <div class="modal-body">
+        <form [formGroup]="userForm">
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Email *</label>
+              <input type="email" class="form-control" formControlName="email" 
+                     [class.is-invalid]="userForm.get('email')?.invalid && userForm.get('email')?.touched">
+              <div class="invalid-feedback">Email invalide</div>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Rôle *</label>
+              <select class="form-select" formControlName="role">
+                <option value="SUPER_ADMIN">Super Admin</option>
+                <option value="ADMIN">Administrateur</option>
+                <option value="RESPONSABLE_COMMERCIAL">Resp. Commercial</option>
+                <option value="COMMERCIAL">Commercial</option>
+                <option value="CLIENT">Client</option>
+                <option value="AFFILIATE">Affilié</option>
+              </select>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Nom *</label>
+              <input type="text" class="form-control" formControlName="nom" 
+                     [class.is-invalid]="userForm.get('nom')?.invalid && userForm.get('nom')?.touched">
+              <div class="invalid-feedback">Nom requis</div>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Prénom *</label>
+              <input type="text" class="form-control" formControlName="prenom" 
+                     [class.is-invalid]="userForm.get('prenom')?.invalid && userForm.get('prenom')?.touched">
+              <div class="invalid-feedback">Prénom requis</div>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Téléphone</label>
+              <input type="tel" class="form-control" formControlName="telephone" placeholder="0612345678" 
+                     [class.is-invalid]="userForm.get('telephone')?.invalid && userForm.get('telephone')?.touched">
+              <div class="invalid-feedback">Format invalide (ex: 0612345678)</div>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Mot de passe *</label>
+              <div class="input-group">
+                <input [type]="showPassword ? 'text' : 'password'" class="form-control" formControlName="password" 
+                       [class.is-invalid]="userForm.get('password')?.invalid && userForm.get('password')?.touched">
+                <button class="btn btn-outline-secondary" type="button" (click)="togglePasswordVisibility()">
+                  <i class="fas" [class.fa-eye]="!showPassword" [class.fa-eye-slash]="showPassword"></i>
+                </button>
+                <button class="btn btn-outline-secondary" type="button" (click)="generatePassword()">
+                  <i class="fas fa-sync-alt"></i>
+                </button>
+              </div>
+              <div class="invalid-feedback">Minimum 6 caractères</div>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Confirmer mot de passe *</label>
+              <input [type]="showPassword ? 'text' : 'password'" class="form-control" formControlName="confirmPassword" 
+                     [class.is-invalid]="userForm.hasError('passwordMismatch') && userForm.get('confirmPassword')?.touched">
+              <div class="invalid-feedback">Les mots de passe ne correspondent pas</div>
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" (click)="closeCreateModal()">Annuler</button>
+        <button type="button" class="btn btn-primary" (click)="createUser()" [disabled]="userForm.invalid || loading">
+          <i class="fas fa-save me-2"></i>Créer
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Édition -->
+<div class="modal fade" tabindex="-1" #editModal>
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h4 class="modal-title"><i class="fas fa-edit me-2"></i>Modifier utilisateur</h4>
+        <button type="button" class="btn-close" (click)="closeEditModal()"></button>
+      </div>
+      <div class="modal-body">
+        <form [formGroup]="editForm">
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Nom *</label>
+              <input type="text" class="form-control" formControlName="nom" 
+                     [class.is-invalid]="editForm.get('nom')?.invalid && editForm.get('nom')?.touched">
+              <div class="invalid-feedback">Nom requis</div>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Prénom *</label>
+              <input type="text" class="form-control" formControlName="prenom" 
+                     [class.is-invalid]="editForm.get('prenom')?.invalid && editForm.get('prenom')?.touched">
+              <div class="invalid-feedback">Prénom requis</div>
+            </div>
+            <div class="col-md-12 mb-3">
+              <label class="form-label">Téléphone</label>
+              <input type="tel" class="form-control" formControlName="telephone" 
+                     [class.is-invalid]="editForm.get('telephone')?.invalid && editForm.get('telephone')?.touched">
+              <div class="invalid-feedback">Format invalide</div>
+            </div>
+            <div class="col-md-12 mb-3">
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" formControlName="isActive" id="isActiveSwitch">
+                <label class="form-check-label" for="isActiveSwitch">Compte actif</label>
+              </div>
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" (click)="closeEditModal()">Annuler</button>
+        <button type="button" class="btn btn-primary" (click)="updateUser()" [disabled]="editForm.invalid || loading">
+          <i class="fas fa-save me-2"></i>Enregistrer
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Mot de passe -->
+<div class="modal fade" tabindex="-1" #passwordModal>
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h4 class="modal-title"><i class="fas fa-key me-2"></i>Changer mot de passe</h4>
+        <button type="button" class="btn-close" (click)="closePasswordModal()"></button>
+      </div>
+      <div class="modal-body">
+        <form [formGroup]="passwordForm">
+          <div class="mb-3">
+            <label class="form-label">Mot de passe actuel *</label>
+            <input type="password" class="form-control" formControlName="currentPassword" 
+                   [class.is-invalid]="passwordForm.get('currentPassword')?.invalid && passwordForm.get('currentPassword')?.touched">
+            <div class="invalid-feedback">Mot de passe requis</div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Nouveau mot de passe *</label>
+            <input type="password" class="form-control" formControlName="newPassword" 
+                   [class.is-invalid]="passwordForm.get('newPassword')?.invalid && passwordForm.get('newPassword')?.touched">
+            <div class="invalid-feedback">Minimum 6 caractères</div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Confirmer nouveau mot de passe *</label>
+            <input type="password" class="form-control" formControlName="confirmNewPassword" 
+                   [class.is-invalid]="passwordForm.hasError('newPasswordMismatch') && passwordForm.get('confirmNewPassword')?.touched">
+            <div class="invalid-feedback">Les mots de passe ne correspondent pas</div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" (click)="closePasswordModal()">Annuler</button>
+        <button type="button" class="btn btn-primary" (click)="changePassword()" [disabled]="passwordForm.invalid || loading">
+          <i class="fas fa-save me-2"></i>Changer
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,154 @@
+// ── Wrapper ────────────────────────────────────────────────────────────────
+// Must have an explicit height so the Viewer constructor reads nonzero
+// offsetWidth/Height when it calls getRenderDimensions() → setupCamera() /
+// setupRenderer().  min-height is the minimum; the parent can stretch it
+// taller via flex or an explicit height binding.
+
+.gs-wrapper {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 480px;
+  background: #0e0e1a;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+// ── Canvas host ────────────────────────────────────────────────────────────
+// The Viewer appends its <canvas> here in setupRenderer().
+// Must ALWAYS be in the layout (never display:none / visibility:hidden).
+// Overlays sit on top via position:absolute.
+
+.gs-canvas-host {
+  position: absolute;
+  inset: 0;
+
+  // The library's canvas is sized via renderer.setSize() and the built-in
+  // ResizeObserver — do NOT set canvas width/height via CSS (it scales the
+  // canvas element without changing the WebGL render buffer resolution).
+  canvas {
+    display: block;
+  }
+}
+
+// ── Overlays ───────────────────────────────────────────────────────────────
+
+.gs-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 24px;
+  color: #fff;
+  text-align: center;
+
+  i   { font-size: 2.5rem; opacity: 0.6; }
+  p   { margin: 0; font-size: 0.9rem; opacity: 0.8; max-width: 280px; }
+}
+
+.gs-loading { background: rgba(14, 14, 26, 0.92); }
+.gs-error   { background: rgba(30, 10, 10, 0.92); i { color: #f97316; } }
+.gs-empty   { background: rgba(14, 14, 26, 0.70); i { color: #6366f1; } }
+
+// ── Spinner ────────────────────────────────────────────────────────────────
+
+.gs-spinner {
+  width: 48px;
+  height: 48px;
+  border: 4px solid rgba(255, 255, 255, 0.15);
+  border-top-color: #6366f1;
+  border-radius: 50%;
+  animation: gs-spin 0.9s linear infinite;
+}
+
+@keyframes gs-spin { to { transform: rotate(360deg); } }
+
+// ── Buttons ────────────────────────────────────────────────────────────────
+
+.gs-btn {
+  margin-top: 8px;
+  padding: 8px 20px;
+  background: #6366f1;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: background 0.2s;
+  &:hover { background: #4f46e5; }
+}
+
+.gs-debug-toggle {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 20;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(14, 14, 26, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+  &:hover { background: rgba(99, 102, 241, 0.5); color: #fff; }
+}
+
+// ── Debug panel ────────────────────────────────────────────────────────────
+
+.gs-debug-panel {
+  position: absolute;
+  top: 50px;
+  right: 10px;
+  z-index: 20;
+  width: 220px;
+  background: rgba(14, 14, 26, 0.90);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  padding: 12px 14px;
+  color: #ccc;
+  font-size: 0.78rem;
+
+  .gs-debug-title {
+    margin: 0 0 10px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #6366f1;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 10px;
+
+    span {
+      display: flex;
+      justify-content: space-between;
+      em { font-style: normal; color: #a5b4fc; font-weight: 500; }
+    }
+
+    input[type='range'] {
+      width: 100%;
+      accent-color: #6366f1;
+      cursor: pointer;
+    }
+  }
+
+  .gs-debug-note {
+    margin: 8px 0 0;
+    color: rgba(255, 255, 255, 0.35);
+    font-size: 0.72rem;
+    line-height: 1.5;
+  }
+}

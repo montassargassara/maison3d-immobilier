@@ -1,0 +1,164 @@
+<div class="property-map-container">
+  <!-- En-tête avec statistiques -->
+  <div class="map-header" *ngIf="showFilters">
+    <div class="map-stats">
+      <div class="stat-item">
+        <span class="stat-label">Biens trouvés:</span>
+        <span class="stat-value">{{ getPropertyStats().total }}</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">Prix moyen:</span>
+        <span class="stat-value">{{ formatNumber(getPropertyStats().averagePrice) }} €</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">Surface moyenne:</span>
+        <span class="stat-value">{{ getPropertyStats().averageArea }} m²</span>
+      </div>
+    </div>
+    
+    <div class="map-actions">
+      <button (click)="exportMapAsImage()" class="btn-export" title="Exporter la carte">
+        📥 Exporter
+      </button>
+      <button (click)="forceMapResize()" class="btn-refresh" title="Redimensionner la carte">
+        🔄
+      </button>
+    </div>
+  </div>
+
+  <!-- Contenu principal -->
+  <div class="map-main">
+    <!-- Panneau des filtres -->
+    <div class="filter-panel" *ngIf="showFilters">
+      <div class="filter-section">
+        <h4>🔍 Filtres</h4>
+        
+        <!-- Type de propriété -->
+        <div class="filter-group">
+          <label>Type de bien:</label>
+          <div class="type-filters">
+            <button 
+              *ngFor="let type of availableTypes"
+              [class.active]="propertyTypes.includes(type.value)"
+              (click)="onPropertyTypeToggle(type.value)"
+              class="type-btn"
+              [title]="type.label">
+              {{ type.icon }} {{ type.label }}
+            </button>
+          </div>
+        </div>
+
+        <!-- Plage de prix -->
+        <div class="filter-group">
+          <label>Prix: {{ formatNumber(priceRange.min) }} - {{ formatNumber(priceRange.max) }} €</label>
+          <div class="range-slider">
+            <input type="range" [(ngModel)]="priceRange.min" [min]="0" [max]="5000000" 
+                   step="10000" class="range-input">
+            <input type="range" [(ngModel)]="priceRange.max" [min]="0" [max]="5000000" 
+                   step="10000" class="range-input">
+          </div>
+        </div>
+
+        <!-- Nombre de chambres -->
+        <div class="filter-group">
+          <label>Chambres: {{ bedroomRange.min }} - {{ bedroomRange.max }}</label>
+          <div class="range-slider">
+            <input type="range" [(ngModel)]="bedroomRange.min" [min]="0" [max]="10" 
+                   step="1" class="range-input">
+            <input type="range" [(ngModel)]="bedroomRange.max" [min]="0" [max]="10" 
+                   step="1" class="range-input">
+          </div>
+        </div>
+
+        <!-- Options de la carte -->
+        <div class="filter-group">
+          <label>Type de carte:</label>
+          <select [(ngModel)]="mapType" (change)="onMapTypeChange()" class="map-type-select">
+            <option value="street">Carte standard</option>
+            <option value="satellite">Satellite</option>
+            <option value="topographic">Topographique</option>
+          </select>
+        </div>
+
+        <!-- Recherche par localisation -->
+        <div class="filter-group">
+          <label>Recherche par rayon (km):</label>
+          <div class="radius-search">
+            <input type="range" [(ngModel)]="searchRadius" min="1" max="50" step="1" 
+                   class="radius-input">
+            <span>{{ searchRadius }} km</span>
+            <button (click)="onSearchByLocation()" class="btn-locate">
+              📍 Autour de moi
+            </button>
+          </div>
+        </div>
+
+        <!-- Boutons d'action -->
+        <div class="filter-actions">
+          <button (click)="applyFilters()" class="btn-apply" [disabled]="isLoading">
+            ✅ Appliquer
+          </button>
+          <button (click)="resetFilters()" class="btn-reset">
+            🔄 Réinitialiser
+          </button>
+          <button (click)="debugMap()" class="btn-debug">
+            🐛 Debug
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Conteneur de la carte -->
+    <div class="map-wrapper">
+      <!-- Fallback pendant le chargement -->
+      <div class="map-fallback" *ngIf="isLoading">
+        <div class="fallback-content">
+          <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Chargement de la carte...</span>
+          </div>
+          <p class="mt-2">Chargement de la carte...</p>
+        </div>
+      </div>
+      
+      <div #mapContainer class="map"></div>
+      
+      <!-- Légende -->
+      <div class="map-legend">
+        <div class="legend-title">Légende:</div>
+        <div class="legend-items">
+          <div class="legend-item" *ngFor="let type of availableTypes">
+            <span class="legend-color" [style.background-color]="getColorForType(type.value)"></span>
+            <span>{{ type.label }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Liste des propriétés (optionnel) -->
+  <div class="property-list-sidebar" *ngIf="showFilters && filteredProperties.length > 0">
+    <h4>Propriétés ({{ filteredProperties.length }})</h4>
+    <div class="properties-scroll">
+      <div *ngFor="let property of filteredProperties" 
+           class="property-card"
+           (click)="onPropertyClick(property)">
+        <div class="property-image" 
+             [style.backgroundImage]="'url(' + (property.images[0] || 'https://via.placeholder.com/300x200') + ')'">
+          <span class="property-type">{{ property.type | titlecase }}</span>
+          <span class="property-price">{{ formatNumber(property.price) }} €</span>
+        </div>
+        <div class="property-info">
+          <h5>{{ property.title }}</h5>
+          <p class="property-location">
+            📍 {{ property.address.city }}, {{ property.address.postalCode }}
+          </p>
+          <div class="property-features">
+            <span>🛏️ {{ property.features.bedrooms }}</span>
+            <span>🚿 {{ property.features.bathrooms }}</span>
+            <span>📐 {{ property.features.area }}m²</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

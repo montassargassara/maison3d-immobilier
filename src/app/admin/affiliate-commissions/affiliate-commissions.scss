@@ -1,0 +1,13 @@
+@use '../../../styles/affiliate-shared' as *;
+
+.via-affiliate-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  background: #fef3c7;
+  color: #b45309;
+  vertical-align: middle;
+}

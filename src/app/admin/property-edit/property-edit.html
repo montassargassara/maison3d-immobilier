@@ -1,0 +1,1056 @@
+<div class="pe-shell" [class.loading-mode]="loading">
+
+  <!-- ── TOP BAR ── -->
+  <header class="pe-topbar">
+    <button class="back-btn" type="button" (click)="cancel()">
+      <i class="fas fa-arrow-left"></i>
+    </button>
+    <div class="pe-title-block">
+      <span class="pe-eyebrow">{{ isEditMode ? 'Modifier le bien' : 'Nouveau bien' }}</span>
+      <h1 class="pe-title">{{ isEditMode ? (form.get('titre')?.value || 'Bien sans titre') : 'Ajouter un bien' }}</h1>
+    </div>
+    <div class="pe-topbar-actions">
+      <button class="pe-btn pe-btn-cancel" type="button" (click)="cancel()">
+        <i class="fas fa-arrow-left"></i> Annuler
+      </button>
+
+      <!-- Sauvegarder — action indépendante, toujours visible tant que le bien est éditable -->
+      <button *ngIf="!isReadOnly && !isFinalized"
+              class="pe-btn pe-btn-save" type="button" [disabled]="saving" (click)="onSubmit()">
+        <i class="fas" [class.fa-floppy-disk]="!saving" [class.fa-spinner]="saving" [class.fa-spin]="saving"></i>
+        {{ saving ? 'Enregistrement…' : (isEditMode ? 'Sauvegarder' : 'Créer le bien') }}
+      </button>
+
+      <!-- Valider / Refuser — actions de workflow indépendantes -->
+      <button *ngIf="canApprove" class="pe-btn pe-btn-validate" type="button" (click)="approveProperty()">
+        <i class="fas fa-circle-check"></i> Valider le bien
+      </button>
+      <button *ngIf="canApprove" class="pe-btn pe-btn-reject" type="button" (click)="rejectProperty()">
+        <i class="fas fa-circle-xmark"></i> Refuser le bien
+      </button>
+    </div>
+  </header>
+
+  <!-- ── READ-ONLY BANNER ── -->
+  <div class="pe-validation-banner banner-info" *ngIf="isReadOnly">
+    <i class="fas fa-lock"></i>
+    {{ readOnlyBannerMessage }}
+  </div>
+
+  <!-- ── VALIDATION STATUS BANNER ── -->
+  <div class="pe-validation-banner"
+       *ngIf="isEditMode && validationStatus && validationStatus !== 'APPROVED'"
+       [class.banner-warning]="validationStatus === 'PENDING_RESPONSABLE' || validationStatus === 'PENDING_ADMIN'"
+       [class.banner-danger]="validationStatus === 'REJECTED'">
+    <i class="fas"
+       [class.fa-clock]="validationStatus === 'PENDING_RESPONSABLE' || validationStatus === 'PENDING_ADMIN'"
+       [class.fa-times-circle]="validationStatus === 'REJECTED'"></i>
+    <span *ngIf="validationStatus === 'PENDING_RESPONSABLE'">En attente de validation par le Responsable Commercial.</span>
+    <span *ngIf="validationStatus === 'PENDING_ADMIN'">En attente de validation finale et de définition de la commission par l'Admin.</span>
+    <span *ngIf="validationStatus === 'REJECTED'">
+      Bien refusé. Raison : <strong>{{ rejectionReason || 'Non précisée' }}</strong>
+    </span>
+  </div>
+  <div class="pe-validation-banner banner-info" *ngIf="isCommercial && isEditMode">
+    <i class="fas fa-info-circle"></i>
+    Vous êtes Commercial : prix et commission sont définis par votre hiérarchie.
+  </div>
+
+  <!-- ── ALERTS ── -->
+  <div class="pe-alerts" *ngIf="successMessage || errorMessage">
+    <div class="alert alert-success" *ngIf="successMessage">
+      <i class="fas fa-check-circle"></i> {{ successMessage }}
+    </div>
+    <div class="alert alert-error" *ngIf="errorMessage">
+      <i class="fas fa-exclamation-circle"></i> {{ errorMessage }}
+      <button class="alert-close" type="button" (click)="errorMessage = ''">×</button>
+    </div>
+  </div>
+
+  <!-- ── LOADING SKELETON ── -->
+  <div class="pe-skeleton" *ngIf="loading">
+    <div class="skel-nav"></div>
+    <div class="skel-body">
+      <div class="skel-line long"></div>
+      <div class="skel-line"></div>
+      <div class="skel-line short"></div>
+    </div>
+  </div>
+
+  <!-- ── MAIN CONTENT ── -->
+  <div class="pe-body" *ngIf="!loading" [formGroup]="form">
+
+    <!-- SIDEBAR NAV -->
+    <nav class="pe-sidenav">
+      <button
+        *ngFor="let s of sections"
+        class="snav-item"
+        [class.active]="activeSection === s.id"
+        type="button"
+        (click)="setSection(s.id)">
+        <i class="fas" [ngClass]="s.icon"></i>
+        <span>{{ s.label }}</span>
+      </button>
+    </nav>
+
+    <!-- FORM PANELS -->
+    <div class="pe-panels">
+
+      <!-- ── GENERAL ── -->
+      <section class="pe-panel" [class.hidden]="activeSection !== 'general'">
+        <div class="panel-head">
+          <h2><i class="fas fa-file-alt"></i> Informations générales</h2>
+          <p>Titre, description, type et statut du bien.</p>
+        </div>
+
+        <div class="field-group">
+          <label class="field-label required">Titre du bien</label>
+          <input
+            class="field-input"
+            [class.field-error]="isInvalid('titre')"
+            type="text"
+            formControlName="titre"
+            placeholder="ex. Appartement F3 lumineux, centre Tunis">
+          <span class="error-msg" *ngIf="getFieldError('titre')">{{ getFieldError('titre') }}</span>
+        </div>
+
+        <div class="field-group">
+          <label class="field-label">Description</label>
+          <textarea
+            class="field-textarea"
+            formControlName="description"
+            rows="5"
+            placeholder="Décrivez le bien : caractéristiques, atouts, environnement…"></textarea>
+          <span class="char-count">{{ form.get('description')?.value?.length || 0 }} / 2000</span>
+        </div>
+
+        <!-- Status lock banner -->
+        @if (isEditMode && isFinalized) {
+          <div class="alert alert-danger d-flex align-items-start gap-2 mb-3">
+            <i class="fas fa-gavel mt-1"></i>
+            <div>
+              <strong>Bien définitivement vendu — consultation seule</strong>
+              <div style="font-size:0.85rem; margin-top:0.2rem;">Ce bien a été vendu et ne peut plus être modifié. Retrouvez-le dans <strong>Transactions &amp; Ventes</strong>.</div>
+            </div>
+          </div>
+        } @else if (isEditMode && isStatusLocked) {
+          <div class="alert alert-warning d-flex align-items-start gap-2 mb-3">
+            <i class="fas fa-lock mt-1"></i>
+            <div>
+              <strong>Statut verrouillé</strong>
+              <div style="font-size:0.85rem; margin-top:0.2rem;">{{ statusLockReason }}</div>
+            </div>
+          </div>
+        }
+
+        <div class="fields-row">
+          <div class="field-group">
+            <label class="field-label required">Type de bien</label>
+            <select class="field-select" formControlName="type">
+              <option *ngFor="let t of propertyTypes" [value]="t.value">{{ t.label }}</option>
+            </select>
+          </div>
+          <div class="field-group">
+            <label class="field-label required">Statut</label>
+            <select class="field-select" formControlName="statut">
+              <option *ngFor="let s of availableStatusOptions" [value]="s.value">{{ s.label }}</option>
+            </select>
+            @if (isStatusLocked) {
+              <small class="text-muted"><i class="fas fa-lock me-1"></i>Modification désactivée</small>
+            }
+          </div>
+        </div>
+
+        <!-- Rental duration — shown only for LOCATION category when LOUE status selected -->
+        @if (form.get('categorie')?.value === 'LOCATION' && form.get('statut')?.value === 'LOUE') {
+          <div class="field-group">
+            <label class="field-label required">Durée de location (mois)</label>
+            <input class="field-input" type="number" formControlName="rentalDurationMonths"
+                   placeholder="ex. 12" min="1">
+            <small class="text-muted">Utilisé pour déverrouiller automatiquement le bien à l'expiration.</small>
+          </div>
+        }
+
+        <div class="fields-row">
+          <div class="field-group">
+            <label class="field-label">Surface (m²)</label>
+            <input class="field-input" type="number" formControlName="surface" placeholder="ex. 85" min="1">
+            <span class="error-msg" *ngIf="getFieldError('surface')">{{ getFieldError('surface') }}</span>
+          </div>
+          <div class="field-group">
+            <label class="field-label">Chambres</label>
+            <input class="field-input" type="number" formControlName="nbChambres" placeholder="ex. 3" min="0">
+          </div>
+        </div>
+
+        <!-- ── AMENITIES ── -->
+        <div class="amenities-section">
+          <div class="amenities-title">
+            <i class="fas fa-star"></i> Caractéristiques & Équipements
+          </div>
+
+          <!-- Numeric details row -->
+          <div class="fields-row">
+            <div class="field-group">
+              <label class="field-label">Salles de bain</label>
+              <input class="field-input" type="number" formControlName="nbSallesDeBain"
+                     placeholder="ex. 2" min="0">
+            </div>
+            <div class="field-group">
+              <label class="field-label">Étage</label>
+              <input class="field-input" type="number" formControlName="etage"
+                     placeholder="ex. 3" min="0" max="50">
+            </div>
+            <div class="field-group">
+              <label class="field-label">Places parking</label>
+              <input class="field-input" type="number" formControlName="parkingSpaces"
+                     placeholder="ex. 1" min="0">
+            </div>
+            <div class="field-group">
+              <label class="field-label">Année construction</label>
+              <input class="field-input" type="number" formControlName="anneeConstruction"
+                     placeholder="ex. 2015" min="1900" [max]="currentYear">
+            </div>
+          </div>
+
+          <!-- Boolean amenities grid -->
+          <div class="amenities-grid">
+            <label class="amenity-toggle">
+              <input type="checkbox" formControlName="garage">
+              <span class="amenity-icon"><i class="fas fa-car"></i></span>
+              <span class="amenity-label">Garage</span>
+            </label>
+            <label class="amenity-toggle">
+              <input type="checkbox" formControlName="piscine">
+              <span class="amenity-icon"><i class="fas fa-swimming-pool"></i></span>
+              <span class="amenity-label">Piscine</span>
+            </label>
+            <label class="amenity-toggle">
+              <input type="checkbox" formControlName="jardin">
+              <span class="amenity-icon"><i class="fas fa-tree"></i></span>
+              <span class="amenity-label">Jardin</span>
+            </label>
+            <label class="amenity-toggle">
+              <input type="checkbox" formControlName="meuble">
+              <span class="amenity-icon"><i class="fas fa-couch"></i></span>
+              <span class="amenity-label">Meublé</span>
+            </label>
+            <label class="amenity-toggle">
+              <input type="checkbox" formControlName="climatisation">
+              <span class="amenity-icon"><i class="fas fa-snowflake"></i></span>
+              <span class="amenity-label">Climatisation</span>
+            </label>
+            <label class="amenity-toggle">
+              <input type="checkbox" formControlName="securite">
+              <span class="amenity-icon"><i class="fas fa-shield-halved"></i></span>
+              <span class="amenity-label">Sécurité</span>
+            </label>
+            <label class="amenity-toggle">
+              <input type="checkbox" formControlName="prochePlage">
+              <span class="amenity-icon"><i class="fas fa-umbrella-beach"></i></span>
+              <span class="amenity-label">Proche plage</span>
+            </label>
+            <label class="amenity-toggle">
+              <input type="checkbox" formControlName="procheTransport">
+              <span class="amenity-icon"><i class="fas fa-bus"></i></span>
+              <span class="amenity-label">Proche transport</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Category toggle -->
+        <div class="field-group">
+          <label class="field-label">Catégorie</label>
+          <div class="toggle-group">
+            <button
+              type="button"
+              class="toggle-btn"
+              [class.active]="form.get('categorie')?.value === 'VENTE'"
+              (click)="form.get('categorie')?.setValue('VENTE')">
+              <i class="fas fa-hand-holding-usd"></i> Vente
+            </button>
+            <button
+              type="button"
+              class="toggle-btn"
+              [class.active]="form.get('categorie')?.value === 'LOCATION'"
+              (click)="form.get('categorie')?.setValue('LOCATION')">
+              <i class="fas fa-key"></i> Location
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── LOCATION ── -->
+      <section class="pe-panel" [class.hidden]="activeSection !== 'location'">
+        <div class="panel-head">
+          <h2><i class="fas fa-map-marker-alt"></i> Localisation</h2>
+          <p>Adresse, ville et coordonnées géographiques.</p>
+        </div>
+
+        <div class="field-group">
+          <label class="field-label required">Adresse complète</label>
+          <input
+            class="field-input"
+            [class.field-error]="isInvalid('adresse')"
+            type="text"
+            formControlName="adresse"
+            placeholder="ex. 12 Rue de la République, Tunis">
+          <span class="error-msg" *ngIf="getFieldError('adresse')">{{ getFieldError('adresse') }}</span>
+        </div>
+
+        <div class="fields-row">
+          <div class="field-group">
+            <label class="field-label">Pays</label>
+            <input class="field-input" type="text" formControlName="country" placeholder="Tunisie">
+          </div>
+          <div class="field-group">
+            <label class="field-label">Ville</label>
+            <input class="field-input" type="text" formControlName="city" placeholder="ex. Tunis, Sousse…">
+          </div>
+        </div>
+
+        <div class="fields-row">
+          <div class="field-group">
+            <label class="field-label">Latitude</label>
+            <input class="field-input" type="number" step="0.000001" formControlName="latitude" placeholder="ex. 36.8189">
+          </div>
+          <div class="field-group">
+            <label class="field-label">Longitude</label>
+            <input class="field-input" type="number" step="0.000001" formControlName="longitude" placeholder="ex. 10.1658">
+          </div>
+        </div>
+
+        <div class="map-hint" *ngIf="form.get('latitude')?.value && form.get('longitude')?.value">
+          <i class="fas fa-map-pin"></i>
+          Coordonnées enregistrées : {{ form.get('latitude')?.value | number:'1.4-6' }}, {{ form.get('longitude')?.value | number:'1.4-6' }}
+        </div>
+
+        <div class="location-map-card">
+          <div class="location-map-toolbar">
+            <div class="location-search">
+              <i class="fas fa-search"></i>
+              <input
+                class="field-input"
+                type="text"
+                [formControl]="searchControl"
+                placeholder="Rechercher une adresse, ville ou pays"
+                (keyup.enter)="onSearchLocation()">
+            </div>
+            <div class="location-actions">
+              <button class="btn-ghost" type="button" (click)="onSearchLocation()" [disabled]="isGeocoding">
+                <i class="fas" [class.fa-spinner]="isGeocoding" [class.fa-spin]="isGeocoding" [class.fa-search]="!isGeocoding"></i>
+                {{ isGeocoding ? 'Recherche…' : 'Rechercher' }}
+              </button>
+              <button class="btn-ghost" type="button" (click)="onUseCurrentLocation()">
+                <i class="fas fa-location-arrow"></i>
+                Ma position
+              </button>
+            </div>
+          </div>
+
+          <div class="location-map" #mapContainer></div>
+
+          <div class="map-status" *ngIf="isReverseGeocoding">
+            <i class="fas fa-sync fa-spin"></i>
+            Mise a jour de l'adresse…
+          </div>
+        </div>
+      </section>
+
+      <!-- ── PRICING ── -->
+      <section class="pe-panel" [class.hidden]="activeSection !== 'pricing'">
+        <div class="panel-head">
+          <h2><i class="fas fa-tag"></i> Tarification & Commission</h2>
+          <p>Prix de vente ou de location et paramètres de commission.</p>
+        </div>
+
+        <div class="field-group" *ngIf="isVente">
+          <label class="field-label required">Prix de vente (TND)</label>
+          <div class="input-with-unit">
+            <input
+              class="field-input"
+              [class.field-error]="isInvalid('prixVente')"
+              type="number"
+              formControlName="prixVente"
+              placeholder="ex. 350000"
+              min="0">
+            <span class="unit">TND</span>
+          </div>
+          <span class="error-msg" *ngIf="getFieldError('prixVente')">{{ getFieldError('prixVente') }}</span>
+        </div>
+
+        <div class="field-group" *ngIf="!isVente">
+          <label class="field-label required">Prix de location / mois (TND)</label>
+          <div class="input-with-unit">
+            <input
+              class="field-input"
+              [class.field-error]="isInvalid('prixLocation')"
+              type="number"
+              formControlName="prixLocation"
+              placeholder="ex. 1200"
+              min="0">
+            <span class="unit">TND/mois</span>
+          </div>
+          <span class="error-msg" *ngIf="getFieldError('prixLocation')">{{ getFieldError('prixLocation') }}</span>
+        </div>
+
+        <!-- ============================================ -->
+        <!-- AI PRICE ESTIMATION -->
+        <!-- ============================================ -->
+        <div class="ai-estimation-block">
+          <div class="ai-estimation-header">
+            <span class="ai-badge"><i class="fas fa-robot"></i> IA</span>
+            <span class="ai-title">Estimation intelligente du prix</span>
+          </div>
+
+          <button *ngIf="canEditPrice" type="button" class="btn-ai-estimate"
+                  [disabled]="aiEstimating"
+                  (click)="estimatePrice()">
+            <i class="fas fa-wand-magic-sparkles"></i>
+            <span *ngIf="!aiEstimating">Estimer automatiquement</span>
+            <span *ngIf="aiEstimating"><i class="fas fa-spinner fa-spin"></i> Analyse en cours…</span>
+          </button>
+
+          <div class="ai-error" *ngIf="aiError">
+            <i class="fas fa-triangle-exclamation"></i> {{ aiError }}
+          </div>
+
+          <div class="ai-result" *ngIf="aiEstimation">
+            <!-- SALE result -->
+            <div class="ai-result-main" *ngIf="aiSaleEstimation">
+              <span class="ai-result-label">Prix de vente conseillé</span>
+              <span class="ai-result-price">{{ aiSaleEstimation.estimatedPrice | number:'1.0-0' }} TND</span>
+              <span class="ai-result-range">
+                {{ aiSaleEstimation.minPrice | number:'1.0-0' }} – {{ aiSaleEstimation.maxPrice | number:'1.0-0' }} TND
+              </span>
+            </div>
+            <!-- RENTAL result -->
+            <div class="ai-result-main" *ngIf="aiRentalEstimation">
+              <span class="ai-result-label">Loyer mensuel conseillé</span>
+              <span class="ai-result-price">{{ aiRentalEstimation.estimatedMonthlyRent | number:'1.0-0' }} TND/mois</span>
+              <span class="ai-result-range">
+                {{ aiRentalEstimation.minRent | number:'1.0-0' }} – {{ aiRentalEstimation.maxRent | number:'1.0-0' }} TND/mois
+              </span>
+            </div>
+
+            <div class="ai-result-meta">
+              <div class="ai-meta-item">
+                <span class="ai-meta-label">Confiance</span>
+                <div class="ai-confidence-bar">
+                  <div class="ai-confidence-fill"
+                       [style.width.%]="aiEstimation.confidence"
+                       [class.high]="aiEstimation.confidence >= 75"
+                       [class.medium]="aiEstimation.confidence >= 55 && aiEstimation.confidence < 75"
+                       [class.low]="aiEstimation.confidence < 55">
+                  </div>
+                </div>
+                <span class="ai-meta-value">{{ aiEstimation.confidence }}%</span>
+              </div>
+
+              <div class="ai-meta-item">
+                <span class="ai-meta-label">Demande marché</span>
+                <span class="ai-demand-badge"
+                      [class.demand-high]="aiEstimation.marketDemand === 'HIGH'"
+                      [class.demand-medium]="aiEstimation.marketDemand === 'MEDIUM'"
+                      [class.demand-low]="aiEstimation.marketDemand === 'LOW'">
+                  <i class="fas"
+                     [class.fa-fire]="aiEstimation.marketDemand === 'HIGH'"
+                     [class.fa-chart-line]="aiEstimation.marketDemand === 'MEDIUM'"
+                     [class.fa-arrow-trend-down]="aiEstimation.marketDemand === 'LOW'">
+                  </i>
+                  {{ aiEstimation.marketDemand === 'HIGH' ? 'Forte' :
+                     aiEstimation.marketDemand === 'MEDIUM' ? 'Modérée' : 'Faible' }}
+                </span>
+              </div>
+
+              <div class="ai-meta-item">
+                <span class="ai-meta-label">Prix / m²</span>
+                <span class="ai-meta-value">{{ aiEstimation.pricePerM2 | number:'1.0-0' }} TND/m²</span>
+              </div>
+            </div>
+
+            <button type="button" class="btn-ai-apply" (click)="applyAIPrice()">
+              <i class="fas fa-check"></i> Appliquer ce prix
+            </button>
+          </div>
+        </div>
+
+        <!-- ============================================ -->
+        <!-- SALE APPROVAL STATUS BADGES (AJOUTÉ) -->
+        <!-- ============================================ -->
+
+        <!-- PENDING badge -->
+        <div class="sale-approval-badge" *ngIf="pendingSaleApproval === 'PENDING'">
+          <i class="fas fa-hourglass-half"></i>
+          <div class="badge-content">
+            <strong>Demande de vente en attente</strong>
+            <span *ngIf="pendingSaleApproverRole === 'ADMIN'">En attente d'approbation par l'Admin de l'agence</span>
+            <span *ngIf="pendingSaleApproverRole === 'SUPER_ADMIN'">En attente d'approbation par le Super Admin</span>
+            <span *ngIf="pendingSaleStatut">Statut demandé : <strong>{{ pendingSaleStatut }}</strong></span>
+          </div>
+        </div>
+
+        <!-- APPROVED badge -->
+        <div class="sale-approval-badge approved" *ngIf="pendingSaleApproval === 'APPROVED'">
+          <i class="fas fa-check-circle"></i>
+          <div class="badge-content">
+            <strong>Demande de vente approuvée</strong>
+            <span>Le bien a été marqué comme {{ pendingSaleStatut }}</span>
+          </div>
+        </div>
+
+        <!-- REJECTED badge -->
+        <div class="sale-approval-badge rejected" *ngIf="pendingSaleApproval === 'REJECTED'">
+          <i class="fas fa-times-circle"></i>
+          <div class="badge-content">
+            <strong>Demande de vente refusée</strong>
+            <span *ngIf="pendingSaleRejectionReason">Raison : {{ pendingSaleRejectionReason }}</span>
+          </div>
+        </div>
+
+        <!-- Approval controls for ADMIN/SUPER_ADMIN -->
+        <div class="approval-controls" *ngIf="canApproveSale && pendingSaleApproval === 'PENDING'">
+          <button class="btn-success" type="button" (click)="approveSale()" [disabled]="approvingSale">
+            <i class="fas fa-check"></i> Approuver la vente
+          </button>
+          <button class="btn-warning" type="button" (click)="rejectSale()" [disabled]="approvingSale">
+            <i class="fas fa-ban"></i> Refuser la vente
+          </button>
+        </div>
+
+        <!-- Commission + Réseau affilié — uniquement pour les biens en VENTE -->
+        <ng-container *ngIf="isVente">
+          <div class="separator"></div>
+          <h3 class="sub-heading">Commission <span class="optional-badge">optionnelle</span></h3>
+          <p class="sub-hint"><i class="fas fa-info-circle"></i> Laisser vide ou saisir 0 pour aucune commission.</p>
+
+          <div class="fields-row">
+            <div class="field-group">
+              <label class="field-label">Type de commission</label>
+              <select class="field-select" formControlName="commissionType">
+                <option *ngFor="let ct of commissionTypes" [value]="ct.value">{{ ct.label }}</option>
+              </select>
+            </div>
+            <div class="field-group">
+              <label class="field-label">
+                Valeur
+                <span class="badge-unit">{{ form.get('commissionType')?.value === 'PERCENTAGE' ? '%' : 'TND' }}</span>
+              </label>
+              <input
+                class="field-input"
+                type="number"
+                step="0.1"
+                formControlName="commissionPercentage"
+                placeholder="{{ form.get('commissionType')?.value === 'PERCENTAGE' ? '0 = sans commission, ex. 3.5' : '0 = sans commission, ex. 2000' }}"
+                min="0">
+            </div>
+          </div>
+
+          <div class="separator"></div>
+          <h3 class="sub-heading">Réseau affilié</h3>
+          <div class="fields-row">
+            <div class="field-group field-group--full">
+              <label class="toggle-label">
+                <input type="checkbox" formControlName="isAffiliateEligible" class="toggle-checkbox">
+                <span class="toggle-track">
+                  <span class="toggle-thumb"></span>
+                </span>
+                <span class="toggle-text">
+                  Visible pour les affiliés
+                  <small>Les affiliés dont la zone correspond à ce bien pourront le voir et soumettre des offres.</small>
+                </span>
+              </label>
+            </div>
+          </div>
+        </ng-container>
+
+        <div class="info-banner" *ngIf="!isVente">
+          <i class="fas fa-info-circle"></i>
+          Les biens en location n'utilisent pas le système de commission ni le réseau d'affiliation.
+        </div>
+      </section>
+
+      <!-- ── MEDIA ── -->
+      <section class="pe-panel" [class.hidden]="activeSection !== 'media'">
+
+        <!-- Header + upload zone -->
+        <div class="img-section-head">
+          <div class="img-section-title">
+            <h2><i class="fas fa-images"></i> Photos du bien</h2>
+            <p>La première image marquée <strong>Principale</strong> s'affiche en couverture. Glissez-déposez ou cliquez pour ajouter.</p>
+          </div>
+          <button class="img-add-btn" type="button" (click)="imgPickerInput.click()">
+            <i class="fas fa-plus"></i> Ajouter des photos
+          </button>
+          <input #imgPickerInput type="file" accept="image/*" multiple hidden (change)="onImageSelect($event)">
+        </div>
+
+        <!-- Validation error -->
+        <div class="img-error-banner" *ngIf="imageError">
+          <i class="fas fa-triangle-exclamation"></i> {{ imageError }}
+        </div>
+        <div class="img-warning-banner" *ngIf="imageItems.length > 0 && !hasPrimaryImage">
+          <i class="fas fa-exclamation-circle"></i>
+          Aucune image principale définie. Cliquez sur <strong>Définir comme principale</strong> sur l'une des photos.
+        </div>
+
+        <!-- Drop zone (empty state) -->
+        <div class="img-drop-zone"
+             [class.img-drop-zone--has-items]="imageItems.length > 0"
+             (dragover)="$event.preventDefault()"
+             (drop)="onImageDrop($event)"
+             (click)="!imageItems.length && imgPickerInput.click()">
+          <ng-container *ngIf="!imageItems.length">
+            <div class="img-drop-empty">
+              <i class="fas fa-cloud-upload-alt"></i>
+              <span>Glissez vos photos ici ou cliquez pour parcourir</span>
+              <small>JPG · PNG · WebP · max 50 Mo par image</small>
+            </div>
+          </ng-container>
+
+          <!-- Image grid -->
+          <div class="img-grid" *ngIf="imageItems.length">
+            <div class="img-card"
+                 *ngFor="let item of imageItems; let i = index"
+                 [class.img-card--primary]="item.isPrimary"
+                 [class.img-card--new]="item.kind === 'new'">
+
+              <!-- Thumbnail -->
+              <div class="img-thumb">
+                <img [src]="getImageSrc(item)" [alt]="getImageLabel(item)" loading="lazy">
+                <!-- Primary badge -->
+                <span class="img-badge-primary" *ngIf="item.isPrimary">
+                  <i class="fas fa-star"></i> Principale
+                </span>
+                <!-- New badge -->
+                <span class="img-badge-new" *ngIf="item.kind === 'new'">
+                  <i class="fas fa-plus-circle"></i> Nouveau
+                </span>
+              </div>
+
+              <!-- Actions overlay -->
+              <div class="img-card-actions">
+                <button type="button"
+                        class="img-action-btn img-action-primary"
+                        *ngIf="!item.isPrimary"
+                        (click)="setItemAsPrimary(i)"
+                        title="Définir comme principale">
+                  <i class="fas fa-star"></i>
+                  <span>Principale</span>
+                </button>
+                <button type="button"
+                        class="img-action-btn img-action-up"
+                        (click)="moveImageItem(i, i - 1)"
+                        [disabled]="i === 0"
+                        title="Monter">
+                  <i class="fas fa-chevron-up"></i>
+                </button>
+                <button type="button"
+                        class="img-action-btn img-action-down"
+                        (click)="moveImageItem(i, i + 1)"
+                        [disabled]="i === imageItems.length - 1"
+                        title="Descendre">
+                  <i class="fas fa-chevron-down"></i>
+                </button>
+                <button type="button"
+                        class="img-action-btn img-action-delete"
+                        (click)="removeImageItem(i)"
+                        title="Supprimer">
+                  <i class="fas fa-trash"></i>
+                </button>
+              </div>
+
+              <!-- Filename -->
+              <div class="img-card-label" [title]="getImageLabel(item)">
+                {{ getImageLabel(item) }}
+              </div>
+            </div>
+
+            <!-- Add more tile -->
+            <div class="img-card img-card--add" (click)="imgPickerInput.click()" title="Ajouter des images">
+              <i class="fas fa-plus"></i>
+              <span>Ajouter</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="img-count-note" *ngIf="imageItems.length">
+          <i class="fas fa-info-circle"></i>
+          {{ imageItems.length }} photo{{ imageItems.length > 1 ? 's' : '' }} ·
+          {{ imagesToDelete.length ? imagesToDelete.length + ' à supprimer au prochain enregistrement' : 'aucune suppression en attente' }}
+        </div>
+
+      </section>
+
+      <!-- ── ADVANCED MEDIA ── -->
+      <section class="pe-panel" [class.hidden]="activeSection !== 'advanced-media'">
+        <div class="panel-head">
+          <h2><i class="fas fa-cube"></i> Advanced Media</h2>
+          <p>Ajoutez un modele 3D ou une video pour enrichir la visite.</p>
+        </div>
+
+        <div class="media-grid">
+          <!-- ═══════════════════════════════════════
+               MODÈLE 3D — Upload premium
+               ═══════════════════════════════════════ -->
+          <div class="model3d-card" [class.m3d-uploading]="uploadingModel">
+
+            <!-- Header -->
+            <div class="m3d-header">
+              <div class="m3d-header-icon">
+                <i class="fas fa-cube"></i>
+              </div>
+              <div class="m3d-header-text">
+                <h3>Modèle 3D</h3>
+                <div class="m3d-fmt-row">
+                  <span class="m3d-badge">GLB</span>
+                  <span class="m3d-badge">GLTF</span>
+                  <span class="m3d-badge">OBJ</span>
+                  <span class="m3d-badge">FBX</span>
+                  <span class="m3d-badge">PLY</span>
+                  <span class="m3d-maxsize">· Max 1 GB</span>
+                </div>
+              </div>
+              <span class="m3d-status-pill m3d-pill-uploading" *ngIf="uploadingModel">
+                <i class="fas fa-spinner fa-spin"></i> Envoi…
+              </span>
+              <span class="m3d-status-pill m3d-pill-ready"
+                    *ngIf="!uploadingModel && (selectedModelFile || modelPreviewName)">
+                <i class="fas fa-check-circle"></i> Prêt
+              </span>
+            </div>
+
+            <!-- Drop zone -->
+            <div class="m3d-dropzone"
+                 [class.m3d-drag-over]="modelDragOver"
+                 [class.m3d-has-file]="selectedModelFile || modelPreviewName"
+                 [class.m3d-is-uploading]="uploadingModel"
+                 (dragover)="onModelDragOver($event)"
+                 (dragleave)="onModelDragLeave($event)"
+                 (drop)="onModelDrop($event)"
+                 (click)="!selectedModelFile && !modelPreviewName && !uploadingModel && modelInput.click()">
+
+              <!-- Empty state -->
+              <div class="m3d-empty" *ngIf="!selectedModelFile && !modelPreviewName && !uploadingModel">
+                <div class="m3d-empty-icon">
+                  <i class="fas fa-cloud-arrow-up"></i>
+                </div>
+                <p class="m3d-empty-label">Glissez votre modèle 3D ici</p>
+                <p class="m3d-empty-or">— ou —</p>
+                <button class="m3d-browse-btn" type="button" (click)="$event.stopPropagation(); modelInput.click()">
+                  <i class="fas fa-folder-open"></i>
+                  Parcourir les fichiers
+                </button>
+                <p class="m3d-hint">GLB · GLTF · OBJ · FBX · PLY</p>
+              </div>
+
+              <!-- File selected -->
+              <div class="m3d-file-preview" *ngIf="(selectedModelFile || modelPreviewName) && !uploadingModel">
+                <div class="m3d-file-icon" [ngClass]="'m3d-fmt-' + getModelFormat()">
+                  <i class="fas fa-cube"></i>
+                  <span class="m3d-ext-tag">{{ getModelFormat().toUpperCase() }}</span>
+                </div>
+                <div class="m3d-file-meta">
+                  <strong class="m3d-file-name">{{ selectedModelFile?.name || modelPreviewName }}</strong>
+                  <span class="m3d-file-size">{{ modelSizeLabel }}</span>
+                </div>
+                <button class="m3d-remove-btn" type="button" (click)="$event.stopPropagation(); clearModel()" title="Retirer le modèle">
+                  <i class="fas fa-times"></i>
+                  Retirer
+                </button>
+              </div>
+
+              <!-- Upload progress -->
+              <div class="m3d-progress-wrap" *ngIf="uploadingModel">
+                <div class="m3d-progress-icon">
+                  <i class="fas fa-cube"></i>
+                </div>
+                <p class="m3d-progress-label">Envoi du modèle 3D en cours…</p>
+                <div class="m3d-progress-track">
+                  <div class="m3d-progress-fill" [style.width.%]="modelUploadProgress">
+                    <span class="m3d-progress-glow"></span>
+                  </div>
+                </div>
+                <span class="m3d-progress-pct">{{ modelUploadProgress }}%</span>
+              </div>
+
+              <input #modelInput type="file" accept=".glb,.gltf,.obj,.fbx,.ply" hidden (change)="onModelSelect($event)">
+            </div>
+
+            <!-- Error -->
+            <div class="m3d-error" *ngIf="modelError">
+              <i class="fas fa-triangle-exclamation"></i>
+              {{ modelError }}
+            </div>
+
+          </div><!-- /model3d-card -->
+
+          <div class="media-card">
+            <div class="media-card-head">
+              <div>
+                <h3><i class="fas fa-video"></i> Video</h3>
+                <p>Formats supportes: MP4. (Backend requis pour l'upload)</p>
+              </div>
+              <span class="media-pill" *ngIf="uploadingVideo">Upload…</span>
+            </div>
+
+            <div class="media-preview" *ngIf="videoPreviewUrl">
+              <video [src]="videoPreviewUrl" controls preload="metadata"></video>
+            </div>
+
+            <div class="media-drop" (dragover)="$event.preventDefault()" (drop)="onVideoDrop($event)">
+              <div class="media-empty" *ngIf="!selectedVideoFile && !videoPreviewName">
+                <i class="fas fa-cloud-upload-alt"></i>
+                <span>Glisser-deposer une video</span>
+                <small>ou cliquer pour selectionner</small>
+              </div>
+              <div class="media-file" *ngIf="selectedVideoFile || videoPreviewName">
+                <div class="file-meta">
+                  <i class="fas fa-film"></i>
+                  <div>
+                    <strong>{{ selectedVideoFile?.name || videoPreviewName }}</strong>
+                    <small>{{ videoSizeLabel }}</small>
+                  </div>
+                </div>
+                <div class="file-actions">
+                  <button class="btn-ghost" type="button" (click)="clearVideo()">Retirer</button>
+                </div>
+              </div>
+              <input #videoInput type="file" accept="video/mp4" (change)="onVideoSelect($event)">
+              <button class="media-cta" type="button" (click)="videoInput.click()">Choisir un fichier</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="media-note">
+          <i class="fas fa-info-circle"></i>
+          Les medias sont envoyes apres la creation du bien et remplacent le contenu existant.
+        </div>
+
+        <!-- ── VIRTUAL TOUR — visible in both create and edit mode ── 
+        <div class="vtour-card">
+          <div class="vtour-card-left">
+            <div class="vtour-icon">
+              <i class="fas fa-vr-cardboard"></i>
+            </div>
+            <div class="vtour-info">
+              <h3>Visite Virtuelle 360°</h3>
+              <p *ngIf="isEditMode">Générez une visite immersive depuis une vidéo de la propriété. FFmpeg extrait automatiquement les scènes clés.</p>
+              <p *ngIf="!isEditMode">Après avoir créé le bien, vous pourrez générer une visite immersive depuis une vidéo. Cliquez sur le bouton pour créer le bien et lancer la génération.</p>
+              <div class="vtour-badge" *ngIf="existingTour?.status === 'COMPLETED'">
+                <i class="fas fa-check-circle"></i>
+                {{ existingTour!.sceneCount }} scènes générées
+              </div>
+              <div class="vtour-badge vtour-badge-processing" *ngIf="existingTour?.status === 'PROCESSING' || existingTour?.status === 'PENDING'">
+                <i class="fas fa-spinner fa-spin"></i>
+                Génération en cours…
+              </div>
+            </div>
+          </div>
+          <button class="vtour-btn" type="button" (click)="handleTourButtonClick()" [disabled]="saving">
+            <i class="fas" [ngClass]="isEditMode ? 'fa-wand-magic-sparkles' : 'fa-vr-cardboard'"></i>
+            <ng-container *ngIf="isEditMode">{{ existingTour?.status === 'COMPLETED' ? 'Modifier la visite' : 'Générer la visite 3D' }}</ng-container>
+            <ng-container *ngIf="!isEditMode">Générer la visite virtuelle</ng-container>
+          </button>
+        </div>-->
+
+        <!-- ── GAUSSIAN SPLATTING ── 
+        <div class="vtour-card gs-card">
+          <div class="vtour-card-left">
+            <div class="vtour-icon gs-icon">
+              <i class="fas fa-atom"></i>
+            </div>
+            <div class="vtour-info">
+              <h3>Gaussian Splatting 3D <span class="gs-badge-new">IA</span></h3>
+              <p>Générez une scène 3D interactive ultra-réaliste grâce à la technologie Gaussian Splatting. Compatible GPU NVIDIA.</p>
+            </div>
+          </div>
+          <button class="vtour-btn gs-btn" type="button" (click)="showGaussianModal = true" [disabled]="saving">
+            <i class="fas fa-atom"></i> Générer en 3D IA
+          </button>
+        </div>-->
+
+        <!-- ── MAP ANYTHING 3D ── -->
+        <div class="vtour-card ma-card">
+          <div class="vtour-card-left">
+            <div class="vtour-icon ma-icon">
+              <i class="fas fa-cube"></i>
+            </div>
+            <div class="vtour-info">
+              <h3>MapAnything 3D <span class="gs-badge-new">GLB</span></h3>
+              <p>Générez un modèle GLB standard à partir d'une vidéo. Feed-forward rapide, sans reconstruction SfM, licence Apache 2.0.</p>
+            </div>
+          </div>
+          <button
+            class="vtour-btn ma-btn"
+            type="button"
+            [disabled]="saving"
+            [title]="propertyId ? 'Générer un modèle GLB à partir d\'une vidéo' : 'Créer le bien et lancer la reconstruction 3D'"
+            (click)="handleMapAnythingButtonClick()">
+            <i class="fas fa-cube"></i>
+            {{ saving ? 'Enregistrement…' : (propertyId ? 'Générer GLB 3D' : 'Créer et générer GLB 3D') }}
+          </button>
+        </div>
+
+      </section>
+
+      <!-- ── SHARING (Super Admin only, edit mode, SUPER_ADMIN_OWNED) ── -->
+      <section class="pe-panel" [class.hidden]="activeSection !== 'sharing'" *ngIf="isSuperAdmin && isEditMode && isSuperAdminOwned">
+        <div class="panel-head">
+          <h2><i class="fas fa-share-nodes"></i> Partage avec les agences</h2>
+          <p>Sélectionnez les agences qui pourront voir et travailler sur ce bien.</p>
+        </div>
+
+        <div *ngIf="sharingLoading" class="share-loading-inline">
+          <div class="spinner"></div>
+          <span>Chargement des agences…</span>
+        </div>
+
+        <div *ngIf="!sharingLoading && availableAdmins.length === 0" class="field-group">
+          <p class="share-empty-msg"><i class="fas fa-building-circle-xmark"></i> Aucune agence disponible.</p>
+        </div>
+
+        <ul class="admin-checklist" *ngIf="!sharingLoading && availableAdmins.length > 0">
+          <li *ngFor="let admin of availableAdmins"
+              class="admin-check-item"
+              [class.selected]="isAdminSelected(admin.id)"
+              (click)="toggleAdmin(admin.id)">
+            <span class="check-icon">
+              <i class="fas" [class.fa-square-check]="isAdminSelected(admin.id)" [class.fa-square]="!isAdminSelected(admin.id)"></i>
+            </span>
+            <span class="admin-info-block">
+              <strong>{{ admin.fullName }}</strong>
+              <small>{{ admin.email }}</small>
+            </span>
+          </li>
+        </ul>
+
+        <div class="share-actions" *ngIf="!sharingLoading && availableAdmins.length > 0">
+          <div class="alert alert-success" *ngIf="shareSaved">
+            <i class="fas fa-check-circle"></i> Partage enregistré avec succès.
+          </div>
+          <button class="btn-primary" type="button" [disabled]="sharingLoading" (click)="saveSharing()">
+            <i class="fas" [class.fa-save]="!sharingLoading" [class.fa-spinner]="sharingLoading" [class.fa-spin]="sharingLoading"></i>
+            {{ sharingLoading ? 'Enregistrement…' : 'Enregistrer le partage' }}
+          </button>
+        </div>
+      </section>
+
+    </div><!-- /pe-panels -->
+  </div><!-- /pe-body -->
+
+  <!-- BOTTOM BAR (mobile) -->
+  <div class="pe-bottombar" *ngIf="!loading">
+    <button class="btn-ghost" type="button" (click)="cancel()">Annuler</button>
+    <button class="btn-primary" type="button" [disabled]="saving" (click)="onSubmit()">
+      <i class="fas" [class.fa-save]="!saving" [class.fa-spinner]="saving" [class.fa-spin]="saving"></i>
+      {{ saving ? 'Enregistrement…' : (isEditMode ? 'Sauvegarder' : 'Créer le bien') }}
+    </button>
+  </div>
+
+</div>
+
+<!-- ── Status confirmation modal ──────────────────────────────────────────── -->
+@if (statusConfirmModalOpen && pendingStatusValue) {
+  <div class="modal-overlay" (click)="cancelStatusConfirm()">
+    <div class="modal-panel status-confirm-panel" (click)="$event.stopPropagation()">
+
+      <!-- VENDU modal -->
+      @if (pendingStatusValue === 'VENDU') {
+        <div class="modal-header">
+          <h5><i class="fas fa-gavel text-danger me-2"></i>Confirmer la vente</h5>
+          <button class="btn-close" (click)="cancelStatusConfirm()"></button>
+        </div>
+        <div class="modal-body">
+          <div class="confirm-warning">
+            <i class="fas fa-exclamation-triangle text-danger fa-2x mb-3"></i>
+            <p class="fw-semibold mb-1">Cette action est <strong>définitive et irréversible</strong>.</p>
+            <p class="text-muted" style="font-size:0.875rem;">
+              Le bien sera marqué comme vendu, verrouillé en édition et transféré dans la
+              section <em>Transactions &amp; Ventes</em>. Aucune modification ne sera plus possible.
+            </p>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline-secondary" (click)="cancelStatusConfirm()">Annuler</button>
+          <button class="btn btn-danger" (click)="confirmStatusChange()">
+            <i class="fas fa-gavel me-1"></i>Confirmer la vente
+          </button>
+        </div>
+      }
+
+      <!-- LOUE modal -->
+      @if (pendingStatusValue === 'LOUE') {
+        <div class="modal-header">
+          <h5><i class="fas fa-key text-warning me-2"></i>Confirmer la mise en location</h5>
+          <button class="btn-close" (click)="cancelStatusConfirm()"></button>
+        </div>
+        <div class="modal-body">
+          <p class="text-muted mb-3" style="font-size:0.875rem;">
+            Le bien sera verrouillé jusqu'à la fin de la période de location.
+            Renseignez la durée <em>ou</em> la date de fin.
+          </p>
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Durée (mois)</label>
+            <input type="number" class="form-control" [(ngModel)]="loueMonths" min="1"
+                   placeholder="ex. 12" (input)="loueEndDate = null" />
+          </div>
+
+          <div class="text-center text-muted small mb-3">— ou —</div>
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Date de fin de location</label>
+            <input type="date" class="form-control" [(ngModel)]="loueEndDate"
+                   [min]="today" (input)="loueMonths = null" />
+          </div>
+
+          @if (loueEndDatePreview) {
+            <div class="alert alert-info py-2" style="font-size:0.8rem;">
+              <i class="fas fa-calendar-check me-1"></i>
+              Fin de location prévue le <strong>{{ loueEndDatePreview }}</strong>.
+              Le bien redeviendra modifiable automatiquement après cette date.
+            </div>
+          }
+
+          @if (!loueMonths && !loueEndDate) {
+            <div class="text-danger small">Durée ou date de fin requise.</div>
+          }
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline-secondary" (click)="cancelStatusConfirm()">Annuler</button>
+          <button class="btn btn-warning text-white" (click)="confirmStatusChange()"
+                  [disabled]="!loueConfirmEnabled">
+            <i class="fas fa-key me-1"></i>Confirmer la location
+          </button>
+        </div>
+      }
+
+    </div>
+  </div>
+}
+
+<!-- ── VIRTUAL TOUR MODAL ── -->
+<app-virtual-tour-modal
+  *ngIf="showTourModal"
+  [propertyId]="propertyId"
+  [existingTour]="existingTour"
+  (closed)="closeTourModal()"
+  (tourGenerated)="onTourGenerated($event)">
+</app-virtual-tour-modal>
+
+<!-- ── GAUSSIAN SPLATTING MODAL ── -->
+<app-gaussian-splat-modal
+  *ngIf="showGaussianModal"
+  [propertyId]="propertyId"
+  (closed)="showGaussianModal = false"
+  (modelAccepted)="onSplatAccepted($event)">
+</app-gaussian-splat-modal>
+
+<!-- ── MAP ANYTHING 3D MODAL ── -->
+<app-mapanything-modal
+  *ngIf="showMapAnythingModal"
+  [propertyId]="propertyId"
+  (closed)="showMapAnythingModal = false"
+  (modelReady)="onMapAnythingDone($event)">
+</app-mapanything-modal>

@@ -1,0 +1,295 @@
+<!-- Hero Section -->
+<div class="hero-section gradient-bg text-white py-5">
+  <div class="container">
+    <div class="row align-items-center">
+      <div class="col-lg-8">
+        <h1 class="display-4 fw-bold mb-3">Découvrez votre futur chez-vous en 3D</h1>
+        <p class="lead mb-4">
+          Explorez, personnalisez et visitez virtuellement les plus beaux biens immobiliers.
+          La révolution de l'immobilier commence ici.
+        </p>
+        <div class="d-flex flex-wrap gap-2">
+          <button class="btn btn-light btn-lg" (click)="showFilters = !showFilters">
+            <i class="fas fa-filter me-2"></i>
+            {{ showFilters ? 'Masquer les filtres' : 'Afficher les filtres' }}
+          </button>
+          <button class="btn btn-outline-light btn-lg">
+            <i class="fas fa-play-circle me-2"></i>Voir la démo
+          </button>
+        </div>
+      </div>
+      <div class="col-lg-4 text-center">
+        <div class="hero-illustration">
+          <i class="fas fa-home fa-10x opacity-50"></i>
+          <div class="position-absolute top-50 start-50 translate-middle">
+            <i class="fas fa-cube fa-4x text-white"></i>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Filtres -->
+<div class="container-fluid bg-light py-4" *ngIf="showFilters">
+  <div class="container">
+    <div class="row g-3">
+      <div class="col-md-6 col-lg-3">
+        <label class="form-label">Prix minimum</label>
+        <input type="number" class="form-control" placeholder="Min €" 
+               [(ngModel)]="filters.minPrice" (input)="applyFilters()">
+      </div>
+      <div class="col-md-6 col-lg-3">
+        <label class="form-label">Prix maximum</label>
+        <input type="number" class="form-control" placeholder="Max €" 
+               [(ngModel)]="filters.maxPrice" (input)="applyFilters()">
+      </div>
+      <div class="col-md-6 col-lg-2">
+        <label class="form-label">Chambres min</label>
+        <input type="number" class="form-control" placeholder="Min" min="1"
+               [(ngModel)]="filters.minBedrooms" (input)="applyFilters()">
+      </div>
+      <div class="col-md-6 col-lg-2">
+        <label class="form-label">Salles de bain min</label>
+        <input type="number" class="form-control" placeholder="Min" min="1"
+               [(ngModel)]="filters.minBathrooms" (input)="applyFilters()">
+      </div>
+      <div class="col-md-6 col-lg-2">
+        <label class="form-label">Surface min (m²)</label>
+        <input type="number" class="form-control" placeholder="Min m²" min="20"
+               [(ngModel)]="filters.minArea" (input)="applyFilters()">
+      </div>
+      
+      <!-- Types de propriétés -->
+      <div class="col-12">
+        <label class="form-label">Type de bien</label>
+        <div class="d-flex flex-wrap gap-2">
+          <button *ngFor="let type of propertyTypes" 
+                  class="btn btn-outline-primary d-flex align-items-center"
+                  [class.active]="filters.propertyTypes?.includes(type.value)"
+                  (click)="togglePropertyType(type.value)">
+            <i class="fas {{ type.icon }} me-2"></i>
+            {{ type.label }}
+          </button>
+        </div>
+      </div>
+      
+      <!-- Localisations -->
+      <div class="col-12">
+        <label class="form-label">Villes</label>
+        <div class="d-flex flex-wrap gap-2">
+          <button *ngFor="let location of locations" 
+                  class="btn btn-outline-secondary"
+                  [class.active]="filters.locations?.includes(location)"
+                  (click)="toggleLocation(location)">
+            {{ location }}
+          </button>
+        </div>
+      </div>
+      
+      <!-- Caractéristiques -->
+      <div class="col-12">
+        <label class="form-label">Caractéristiques</label>
+        <div class="d-flex flex-wrap gap-2">
+          <button *ngFor="let feature of featuresList" 
+                  class="btn btn-outline-info"
+                  [class.active]="filters.features?.includes(feature)"
+                  (click)="toggleFeature(feature)">
+            <i class="fas fa-check-circle me-2"></i>
+            {{ feature }}
+          </button>
+        </div>
+      </div>
+      
+      <!-- Actions -->
+      <div class="col-12 d-flex justify-content-between">
+        <div>
+          <span class="badge bg-primary">
+            {{ getActiveFilterCount() }} filtre(s) actif(s)
+          </span>
+          <span class="ms-3 text-muted">
+            {{ getPropertyCount() }} bien(s) trouvé(s)
+          </span>
+        </div>
+        <button class="btn btn-outline-danger" (click)="clearFilters()">
+          <i class="fas fa-times me-2"></i>Effacer tous les filtres
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Barre de recherche -->
+<div class="container-fluid py-4 border-bottom">
+  <div class="container">
+    <div class="row align-items-center">
+      <div class="col-md-8">
+        <div class="input-group">
+          <span class="input-group-text bg-white border-end-0">
+            <i class="fas fa-search"></i>
+          </span>
+          <input type="text" class="form-control border-start-0" 
+                 placeholder="Rechercher par mot-clé, ville, caractéristique..."
+                 [(ngModel)]="searchTerm" (input)="onSearch()">
+        </div>
+      </div>
+      <div class="col-md-4 mt-3 mt-md-0">
+        <div class="d-flex justify-content-end gap-2">
+          <div class="btn-group">
+            <button class="btn btn-outline-secondary" 
+                    [class.active]="viewMode === 'grid'"
+                    (click)="viewMode = 'grid'">
+              <i class="fas fa-th"></i>
+            </button>
+            <button class="btn btn-outline-secondary" 
+                    [class.active]="viewMode === 'list'"
+                    (click)="viewMode = 'list'">
+              <i class="fas fa-list"></i>
+            </button>
+          </div>
+          <button class="btn btn-primary" (click)="showFilters = !showFilters">
+            <i class="fas fa-sliders-h"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Contenu principal -->
+<main class="container-fluid py-5">
+  <div class="container">
+    <!-- Biens en vedette -->
+    <div *ngIf="featuredProperties.length > 0" class="mb-5">
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="text-gradient">
+          <i class="fas fa-star me-2"></i>Biens en vedette
+        </h2>
+        <a href="#" class="btn btn-outline-primary">Voir tout</a>
+      </div>
+      <div class="row g-4">
+        <div class="col-md-4" *ngFor="let property of featuredProperties">
+          <app-property-card 
+            [property]="property"
+            (favoriteToggle)="onFavoriteToggle($event)"
+            (propertyClick)="onPropertyClick($event)">
+          </app-property-card>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tous les biens -->
+    <div>
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="text-gradient">
+          <i class="fas fa-home me-2"></i>Tous les biens
+          <small class="text-muted fs-6">({{ getPropertyCount() }})</small>
+        </h2>
+      </div>
+
+      <!-- Vue grille -->
+      <div *ngIf="viewMode === 'grid'" class="row g-4">
+        <div class="col-md-6 col-lg-4 col-xl-3" *ngFor="let property of filteredProperties">
+          <app-property-card 
+            [property]="property"
+            (favoriteToggle)="onFavoriteToggle($event)"
+            (propertyClick)="onPropertyClick($event)">
+          </app-property-card>
+        </div>
+      </div>
+
+      <!-- Vue liste -->
+      <div *ngIf="viewMode === 'list'" class="list-view">
+        <div *ngFor="let property of filteredProperties" class="list-item card mb-3 hover-shadow">
+          <div class="row g-0">
+            <div class="col-md-4">
+              <img [src]="property.images[0]" class="img-fluid rounded-start h-100" 
+                   [alt]="property.title" style="object-fit: cover;">
+            </div>
+            <div class="col-md-8">
+              <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start">
+                  <div>
+                    <h5 class="card-title">{{ property.title }}</h5>
+                    <p class="card-text text-muted">{{ property.description }}</p>
+                  </div>
+                  <button class="btn btn-link text-danger" (click)="onFavoriteToggle(property.id)">
+                    <i class="fas" [class.fa-heart]="property.isFavorite" 
+                                [class.fa-heart-o]="!property.isFavorite"></i>
+                  </button>
+                </div>
+                
+                <div class="row mt-3">
+                  <div class="col-6 col-md-3">
+                    <div class="text-center">
+                      <i class="fas fa-bed text-primary"></i>
+                      <div class="fw-bold">{{ property.features.bedrooms }}</div>
+                      <small class="text-muted">Chambres</small>
+                    </div>
+                  </div>
+                  <div class="col-6 col-md-3">
+                    <div class="text-center">
+                      <i class="fas fa-bath text-primary"></i>
+                      <div class="fw-bold">{{ property.features.bathrooms }}</div>
+                      <small class="text-muted">SDB</small>
+                    </div>
+                  </div>
+                  <div class="col-6 col-md-3">
+                    <div class="text-center">
+                      <i class="fas fa-ruler-combined text-primary"></i>
+                      <div class="fw-bold">{{ property.features.area }} m²</div>
+                      <small class="text-muted">Surface</small>
+                    </div>
+                  </div>
+                  <div class="col-6 col-md-3">
+                    <div class="text-center">
+                      <h5 class="text-success mb-0">
+                        {{ property.price / 1000 | number:'1.0-0' }}k €
+                      </h5>
+                    </div>
+                  </div>
+                </div>
+                
+                <div class="d-flex justify-content-between align-items-center mt-3">
+                  <div>
+                    <i class="fas fa-map-marker-alt text-muted me-1"></i>
+                    <small class="text-muted">{{ property.address.city }}</small>
+                  </div>
+                  <button class="btn btn-primary" (click)="onPropertyClick(property.id)">
+                    <i class="fas fa-eye me-2"></i>Voir en détail
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Message si aucun résultat -->
+      <div *ngIf="filteredProperties.length === 0" class="text-center py-5">
+        <i class="fas fa-home fa-4x text-muted mb-3"></i>
+        <h3 class="text-muted">Aucun bien ne correspond à votre recherche</h3>
+        <p class="text-muted">Essayez de modifier vos critères de recherche</p>
+        <button class="btn btn-primary mt-3" (click)="clearFilters()">
+          <i class="fas fa-redo me-2"></i>Réinitialiser les filtres
+        </button>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- Section CTA -->
+<div class="container-fluid gradient-bg-secondary text-white py-5">
+  <div class="container text-center">
+    <h2 class="mb-4">Prêt à visiter votre futur chez-vous en réalité virtuelle ?</h2>
+    <p class="lead mb-4">Inscrivez-vous gratuitement pour sauvegarder vos configurations préférées.</p>
+    <div class="d-flex flex-column flex-md-row justify-content-center gap-3">
+      <button class="btn btn-light btn-lg">
+        <i class="fas fa-user-plus me-2"></i>S'inscrire gratuitement
+      </button>
+      <button class="btn btn-outline-light btn-lg">
+        <i class="fas fa-play-circle me-2"></i>Voir la vidéo de démo
+      </button>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,143 @@
+<div class="page-wrapper">
+  <div class="page-header">
+    <div class="page-header-left">
+      <h2><i class="fas fa-file-contract"></i> Mes Offres</h2>
+      <p class="page-subtitle">Suivez l'état de toutes vos offres soumises</p>
+    </div>
+    <div class="page-header-right">
+      <a routerLink="/admin/affiliate-properties" class="btn btn-primary">
+        <i class="fas fa-plus"></i> Nouvelle offre
+      </a>
+      <button class="btn btn-outline" (click)="load()"><i class="fas fa-sync-alt"></i></button>
+    </div>
+  </div>
+
+  <div class="alert alert-success" *ngIf="successMessage" (click)="clearMessages()">
+    <i class="fas fa-check-circle"></i> {{ successMessage }}
+  </div>
+  <div class="alert alert-danger" *ngIf="errorMessage" (click)="clearMessages()">
+    <i class="fas fa-exclamation-circle"></i> {{ errorMessage }}
+  </div>
+
+  <div class="filter-bar">
+    <select [(ngModel)]="statusFilter" (change)="applyFilters()">
+      <option value="">Tous les statuts</option>
+      <option value="PENDING">En attente</option>
+      <option value="ACCEPTED">Acceptées</option>
+      <option value="REJECTED">Rejetées</option>
+      <option value="COMPLETED">Complétées</option>
+      <option value="CANCELLED">Annulées</option>
+    </select>
+  </div>
+
+  <div class="loading-state" *ngIf="loading"><i class="fas fa-spinner fa-spin"></i><span>Chargement…</span></div>
+  <div class="empty-state" *ngIf="!loading && filtered.length === 0">
+    <i class="fas fa-file-contract fa-3x"></i>
+    <h3>Aucune offre</h3>
+    <p>Explorez les biens disponibles et soumettez votre première offre.</p>
+    <a routerLink="/admin/affiliate-properties" class="btn btn-primary" style="margin-top:0.5rem;">
+      <i class="fas fa-home"></i> Voir les biens
+    </a>
+  </div>
+
+  <div class="table-card" *ngIf="!loading && filtered.length > 0">
+    <div class="table-header">
+      <h3><i class="fas fa-list"></i> {{ filtered.length }} offre{{ filtered.length > 1 ? 's' : '' }}</h3>
+    </div>
+    <div class="offers-wrapper">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Bien</th>
+            <th>Acheteur</th>
+            <th>Prix proposé</th>
+            <th>Commission</th>
+            <th>Statut</th>
+            <th>Date</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let o of filtered">
+            <td>
+              <div style="font-weight:600;font-size:0.875rem;">{{ o.propertyTitle }}</div>
+              <div style="font-size:0.775rem;color:var(--text-muted);">{{ o.propertyCity }}</div>
+            </td>
+            <td>
+              <div style="font-size:0.875rem;">{{ o.buyerName }}</div>
+              <div style="font-size:0.775rem;color:var(--text-muted);">{{ o.buyerEmail }}</div>
+            </td>
+            <td style="font-weight:600;color:var(--primary);">{{ fmt(o.offeredPrice) }}</td>
+            <td style="font-size:0.8125rem;">
+              <span *ngIf="o.commissionAmount">{{ fmt(o.commissionAmount) }}</span>
+              <span *ngIf="!o.commissionAmount && o.commissionPercentage">{{ o.commissionPercentage }}%</span>
+              <span *ngIf="!o.commissionAmount && !o.commissionPercentage" class="text-muted">—</span>
+            </td>
+            <td><span class="status-badge" [ngClass]="getStatusClass(o.status)">{{ formatStatus(o.status) }}</span></td>
+            <td style="font-size:0.8125rem;color:var(--text-muted);">{{ formatDate(o.createdAt) }}</td>
+            <td>
+              <div style="display:flex;gap:0.375rem;">
+                <button class="btn btn-ghost btn-sm" (click)="openDetail(o)" title="Détails">
+                  <i class="fas fa-eye"></i>
+                </button>
+                <button class="btn btn-danger-outline btn-sm" *ngIf="o.status === 'PENDING'" (click)="openCancelModal(o)">
+                  <i class="fas fa-times"></i> Annuler
+                </button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Detail Modal -->
+<div class="modal-overlay" *ngIf="detailModalOpen" (click)="closeDetail()">
+  <div class="modal-box" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3><i class="fas fa-file-contract text-primary"></i> Détails de l'offre</h3>
+      <button class="modal-close" (click)="closeDetail()"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="modal-body" *ngIf="detailOffer">
+      <div class="detail-row"><label>Bien</label><span>{{ detailOffer.propertyTitle }}</span></div>
+      <div class="detail-row"><label>Ville</label><span>{{ detailOffer.propertyCity || '—' }}</span></div>
+      <div class="detail-row"><label>Acheteur</label><span>{{ detailOffer.buyerName }}</span></div>
+      <div class="detail-row"><label>Email acheteur</label><span>{{ detailOffer.buyerEmail }}</span></div>
+      <div class="detail-row" *ngIf="detailOffer.buyerPhone"><label>Téléphone</label><span>{{ detailOffer.buyerPhone }}</span></div>
+      <div class="detail-row"><label>Prix proposé</label><span style="font-weight:700;color:var(--primary);">{{ fmt(detailOffer.offeredPrice) }}</span></div>
+      <div class="detail-row" *ngIf="detailOffer.commissionAmount"><label>Commission</label><span>{{ fmt(detailOffer.commissionAmount) }}</span></div>
+      <div class="detail-row"><label>Statut</label>
+        <span class="status-badge" [ngClass]="getStatusClass(detailOffer.status)">{{ formatStatus(detailOffer.status) }}</span>
+      </div>
+      <div class="detail-row" *ngIf="detailOffer.message"><label>Message</label><span>{{ detailOffer.message }}</span></div>
+      <div class="detail-row" *ngIf="detailOffer.rejectionReason"><label>Motif rejet</label>
+        <span style="color:var(--danger);">{{ detailOffer.rejectionReason }}</span>
+      </div>
+      <div class="detail-row"><label>Soumis le</label><span>{{ formatDate(detailOffer.createdAt) }}</span></div>
+      <div class="detail-row" *ngIf="detailOffer.respondedAt"><label>Répondu le</label><span>{{ formatDate(detailOffer.respondedAt) }}</span></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" (click)="closeDetail()">Fermer</button>
+    </div>
+  </div>
+</div>
+
+<!-- Cancel Confirm Modal -->
+<div class="modal-overlay" *ngIf="cancelModalOpen" (click)="closeCancelModal()">
+  <div class="modal-box modal-sm" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3><i class="fas fa-times-circle text-danger"></i> Annuler l'offre</h3>
+      <button class="modal-close" (click)="closeCancelModal()"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="modal-body">
+      <p>Voulez-vous vraiment annuler l'offre pour <strong>{{ cancelTarget?.propertyTitle }}</strong> ?</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" (click)="closeCancelModal()">Retour</button>
+      <button class="btn btn-danger" (click)="confirmCancel()" [disabled]="actionLoading">
+        <i class="fas fa-times-circle"></i> Confirmer l'annulation
+      </button>
+    </div>
+  </div>
+</div>

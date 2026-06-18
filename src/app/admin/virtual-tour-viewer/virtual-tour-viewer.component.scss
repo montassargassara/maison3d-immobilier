@@ -1,0 +1,348 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// Virtual Tour Viewer
+// Premium immersive scene navigator
+// ─────────────────────────────────────────────────────────────────────────────
+
+:host {
+  display: block;
+  width: 100%;
+}
+
+.vtv-shell {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: #080b10;
+  border-radius: 16px;
+  overflow: hidden;
+  user-select: none;
+  outline: none;
+  cursor: grab;
+
+  &:active { cursor: grabbing; }
+
+  &.vtv-fullscreen {
+    position: fixed;
+    inset: 0;
+    border-radius: 0;
+    z-index: 9999;
+    aspect-ratio: unset;
+    height: 100vh;
+  }
+
+  &.vtv-controls-hidden {
+    .vtv-topbar,
+    .vtv-nav,
+    .vtv-bottom,
+    .vtv-kbd-hint { opacity: 0; }
+    cursor: none;
+  }
+}
+
+// ── Scene image ───────────────────────────────────────────────────────────────
+
+.vtv-scene {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.4s ease;
+
+  &.vtv-transition { opacity: 0.3; }
+}
+
+.vtv-scene-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  opacity: 0;
+  transition: opacity 0.35s ease;
+
+  &.vtv-img-visible { opacity: 1; }
+}
+
+// ── Gradient overlays ─────────────────────────────────────────────────────────
+
+.vtv-gradient-top {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 120px;
+  background: linear-gradient(to bottom, rgba(0,0,0,0.65) 0%, transparent 100%);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.vtv-gradient-bottom {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 200px;
+  background: linear-gradient(to top, rgba(0,0,0,0.75) 0%, transparent 100%);
+  pointer-events: none;
+  z-index: 2;
+}
+
+// ── Loading ───────────────────────────────────────────────────────────────────
+
+.vtv-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  color: rgba(255,255,255,0.4);
+  font-size: 0.85rem;
+  z-index: 5;
+  background: #080b10;
+}
+
+.vtv-loading-spinner {
+  font-size: 2rem;
+  color: #6366f1;
+}
+
+// ── Top bar ───────────────────────────────────────────────────────────────────
+
+.vtv-topbar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  padding: 0.875rem 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  z-index: 10;
+  transition: opacity 0.3s;
+}
+
+.vtv-topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.vtv-topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.vtv-vr-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: rgba(99, 102, 241, 0.85);
+  backdrop-filter: blur(8px);
+  border-radius: 99px;
+  padding: 0.3rem 0.75rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #fff;
+
+  i { font-size: 0.9rem; }
+}
+
+.vtv-scene-name {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: rgba(255,255,255,0.9);
+  text-shadow: 0 1px 4px rgba(0,0,0,0.6);
+}
+
+.vtv-counter {
+  font-size: 0.8rem;
+  color: rgba(255,255,255,0.55);
+  font-variant-numeric: tabular-nums;
+}
+
+.vtv-ctrl-btn {
+  background: rgba(0,0,0,0.45);
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: rgba(255,255,255,0.8);
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  transition: background 0.15s, color 0.15s;
+
+  &:hover {
+    background: rgba(99,102,241,0.7);
+    color: #fff;
+  }
+}
+
+// ── Navigation arrows ─────────────────────────────────────────────────────────
+
+.vtv-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(0,0,0,0.5);
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(255,255,255,0.12);
+  color: rgba(255,255,255,0.85);
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  z-index: 10;
+  transition: all 0.15s;
+
+  &:hover:not(:disabled) {
+    background: rgba(99,102,241,0.75);
+    border-color: transparent;
+    color: #fff;
+    transform: translateY(-50%) scale(1.08);
+  }
+
+  &:disabled { opacity: 0.25; cursor: default; }
+}
+
+.vtv-nav-prev { left: 0.875rem; }
+.vtv-nav-next { right: 0.875rem; }
+
+// ── Bottom bar ────────────────────────────────────────────────────────────────
+
+.vtv-bottom {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 0.75rem 1rem 0.875rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  z-index: 10;
+  transition: opacity 0.3s;
+}
+
+// ── Dot indicators ────────────────────────────────────────────────────────────
+
+.vtv-dots {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.vtv-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.3);
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.2s;
+
+  &.vtv-dot-active {
+    background: #fff;
+    transform: scale(1.3);
+    box-shadow: 0 0 6px rgba(255,255,255,0.6);
+  }
+
+  &:hover:not(.vtv-dot-active) { background: rgba(255,255,255,0.55); }
+}
+
+// ── Thumbnail strip ───────────────────────────────────────────────────────────
+
+.vtv-thumb-strip {
+  display: flex;
+  gap: 0.4rem;
+  overflow-x: auto;
+  max-width: 100%;
+  padding: 0 0.25rem 0.25rem;
+  scrollbar-width: none;
+  &::-webkit-scrollbar { display: none; }
+}
+
+.vtv-thumb-item {
+  flex-shrink: 0;
+  width: 80px;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  background: none;
+  padding: 0;
+  transition: border-color 0.15s, opacity 0.15s;
+  opacity: 0.6;
+  display: flex;
+  flex-direction: column;
+
+  img {
+    width: 80px;
+    height: 48px;
+    object-fit: cover;
+    display: block;
+  }
+
+  span {
+    background: rgba(0,0,0,0.7);
+    color: rgba(255,255,255,0.8);
+    font-size: 0.65rem;
+    padding: 2px 4px;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  &.vtv-thumb-active {
+    border-color: #6366f1;
+    opacity: 1;
+  }
+
+  &:hover:not(.vtv-thumb-active) {
+    opacity: 0.85;
+    border-color: rgba(255,255,255,0.3);
+  }
+}
+
+// ── Keyboard hint ─────────────────────────────────────────────────────────────
+
+.vtv-kbd-hint {
+  position: absolute;
+  bottom: 0.75rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0,0,0,0.55);
+  backdrop-filter: blur(6px);
+  border-radius: 99px;
+  padding: 0.25rem 0.875rem;
+  font-size: 0.72rem;
+  color: rgba(255,255,255,0.45);
+  white-space: nowrap;
+  z-index: 11;
+  pointer-events: none;
+
+  i { margin-right: 4px; }
+}
+
+// ── Responsive ────────────────────────────────────────────────────────────────
+
+@media (max-width: 640px) {
+  .vtv-nav { width: 38px; height: 38px; font-size: 0.9rem; }
+  .vtv-nav-prev { left: 0.5rem; }
+  .vtv-nav-next { right: 0.5rem; }
+  .vtv-thumb-strip { display: none; }
+  .vtv-kbd-hint { display: none; }
+  .vtv-scene-name { display: none; }
+}

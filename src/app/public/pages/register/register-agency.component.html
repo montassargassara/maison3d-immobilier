@@ -1,0 +1,193 @@
+<div class="register-page">
+  <div class="register-container">
+
+    @if (submitted) {
+      <div class="success-card">
+        <div class="success-icon">
+          <i class="fas fa-check-circle"></i>
+        </div>
+        <h2>Demande envoyée !</h2>
+        <p>
+          Votre demande d'inscription a bien été reçue. Notre équipe va examiner votre dossier
+          et vous contactera par e-mail sous 48 h ouvrées.
+        </p>
+        <a class="btn-back" routerLink="/register">Retour aux options d'inscription</a>
+      </div>
+    } @else {
+      <div class="register-header">
+        <div class="register-header-icon agency">
+          <i class="fas fa-building"></i>
+        </div>
+        <h1>Créer un compte Agence</h1>
+        <p>Remplissez le formulaire ci-dessous. Votre compte sera activé après validation par notre équipe.</p>
+      </div>
+
+      <form class="register-form" (ngSubmit)="submit()" #f="ngForm" novalidate>
+
+        @if (errorMessage) {
+          <div class="form-error-banner">
+            <i class="fas fa-exclamation-triangle"></i> {{ errorMessage }}
+          </div>
+        }
+
+        <!-- Section : Responsable -->
+        <div class="form-section">
+          <h3 class="section-title">
+            <i class="fas fa-user"></i> Responsable de l'agence
+          </h3>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="nom">Nom <span class="required">*</span></label>
+              <input
+                id="nom"
+                type="text"
+                [(ngModel)]="form.nom"
+                name="nom"
+                required
+                minlength="2"
+                placeholder="Votre nom"
+                #nom="ngModel"
+              />
+              @if (nom.invalid && nom.touched) {
+                <span class="field-error">Le nom est requis (min. 2 caractères).</span>
+              }
+            </div>
+            <div class="form-group">
+              <label for="prenom">Prénom <span class="required">*</span></label>
+              <input
+                id="prenom"
+                type="text"
+                [(ngModel)]="form.prenom"
+                name="prenom"
+                required
+                minlength="2"
+                placeholder="Votre prénom"
+                #prenom="ngModel"
+              />
+              @if (prenom.invalid && prenom.touched) {
+                <span class="field-error">Le prénom est requis (min. 2 caractères).</span>
+              }
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="telephone">Téléphone</label>
+            <input
+              id="telephone"
+              type="tel"
+              [(ngModel)]="form.telephone"
+              name="telephone"
+              placeholder="+216 XX XXX XXX"
+            />
+          </div>
+        </div>
+
+        <!-- Section : Agence -->
+        <div class="form-section">
+          <h3 class="section-title">
+            <i class="fas fa-building"></i> Informations de l'agence
+          </h3>
+          <div class="form-group">
+            <label for="agencyName">Nom de l'agence <span class="required">*</span></label>
+            <input
+              id="agencyName"
+              type="text"
+              [(ngModel)]="form.agencyName"
+              name="agencyName"
+              required
+              minlength="2"
+              placeholder="Ex : Immobilier Prestige"
+              #agencyName="ngModel"
+            />
+            @if (agencyName.invalid && agencyName.touched) {
+              <span class="field-error">Le nom de l'agence est requis.</span>
+            }
+          </div>
+          <div class="form-group">
+            <label for="description">Description (optionnel)</label>
+            <textarea
+              id="description"
+              [(ngModel)]="form.description"
+              name="description"
+              rows="3"
+              placeholder="Décrivez brièvement votre agence, votre zone d'activité…"
+            ></textarea>
+          </div>
+        </div>
+
+        <!-- Section : Compte -->
+        <div class="form-section">
+          <h3 class="section-title">
+            <i class="fas fa-lock"></i> Accès au compte
+          </h3>
+          <div class="form-group">
+            <label for="email">Adresse e-mail <span class="required">*</span></label>
+            <input
+              id="email"
+              type="email"
+              [(ngModel)]="form.email"
+              name="email"
+              required
+              email
+              placeholder="contact@votre-agence.com"
+              #email="ngModel"
+            />
+            @if (email.invalid && email.touched) {
+              <span class="field-error">Adresse e-mail invalide.</span>
+            }
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="password">Mot de passe <span class="required">*</span></label>
+              <input
+                id="password"
+                type="password"
+                [(ngModel)]="form.password"
+                name="password"
+                required
+                minlength="8"
+                placeholder="Min. 8 caractères"
+                #password="ngModel"
+              />
+              @if (password.invalid && password.touched) {
+                <span class="field-error">Mot de passe requis (min. 8 caractères).</span>
+              }
+            </div>
+            <div class="form-group">
+              <label for="confirmPassword">Confirmer le mot de passe <span class="required">*</span></label>
+              <input
+                id="confirmPassword"
+                type="password"
+                [(ngModel)]="confirmPassword"
+                name="confirmPassword"
+                required
+                placeholder="Répétez le mot de passe"
+              />
+              @if (passwordMismatch) {
+                <span class="field-error">Les mots de passe ne correspondent pas.</span>
+              }
+            </div>
+          </div>
+        </div>
+
+        <button
+          type="submit"
+          class="submit-btn"
+          [disabled]="loading || f.invalid || passwordMismatch"
+        >
+          @if (loading) {
+            <span class="spinner"></span> Envoi en cours…
+          } @else {
+            <i class="fas fa-paper-plane"></i> Soumettre ma demande
+          }
+        </button>
+
+      </form>
+
+      <p class="form-footer">
+        Vous avez déjà un compte ?
+        <a routerLink="/admin/login">Se connecter</a>
+      </p>
+    }
+
+  </div>
+</div>

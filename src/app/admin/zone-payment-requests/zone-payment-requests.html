@@ -1,0 +1,253 @@
+<!-- zone-payment-requests.html -->
+<div class="page-container">
+
+  <!-- Header -->
+  <div class="page-header">
+    <div class="page-header-left">
+      <h1 class="page-title">
+        <i class="fas fa-file-invoice-dollar"></i>
+        Demandes de paiement zones
+      </h1>
+      <p class="page-subtitle">Vérifiez les preuves de virement et activez les zones affiliées.</p>
+    </div>
+    <button class="btn btn-outline-secondary btn-sm" (click)="load()">
+      <i class="fas fa-sync-alt"></i> Actualiser
+    </button>
+  </div>
+
+  <!-- Alerts -->
+  @if (successMessage) {
+    <div class="alert alert-success alert-dismissible d-flex align-items-center gap-2" role="alert">
+      <i class="fas fa-check-circle"></i>
+      {{ successMessage }}
+      <button type="button" class="btn-close ms-auto" (click)="clearMessages()"></button>
+    </div>
+  }
+  @if (errorMessage) {
+    <div class="alert alert-danger alert-dismissible d-flex align-items-center gap-2" role="alert">
+      <i class="fas fa-exclamation-circle"></i>
+      {{ errorMessage }}
+      <button type="button" class="btn-close ms-auto" (click)="clearMessages()"></button>
+    </div>
+  }
+
+  <!-- Stats bar -->
+  <div class="stats-bar">
+    <div class="stat-pill">
+      <span class="stat-value">{{ requests.length }}</span>
+      <span class="stat-label">Total</span>
+    </div>
+    <div class="stat-pill stat-pill-pending">
+      <span class="stat-value">{{ pendingCount }}</span>
+      <span class="stat-label">En attente</span>
+    </div>
+    <div class="stat-pill stat-pill-approved">
+      <span class="stat-value">{{ countByStatus('APPROVED') }}</span>
+      <span class="stat-label">Approuvées</span>
+    </div>
+    <div class="stat-pill stat-pill-rejected">
+      <span class="stat-value">{{ countByStatus('REJECTED') }}</span>
+      <span class="stat-label">Rejetées</span>
+    </div>
+  </div>
+
+  <!-- Filter tabs -->
+  <div class="filter-tabs">
+    <button class="filter-tab" [class.active]="filterStatus === 'ALL'"      (click)="filterStatus = 'ALL'">Toutes</button>
+    <button class="filter-tab" [class.active]="filterStatus === 'PENDING'"  (click)="filterStatus = 'PENDING'">En attente</button>
+    <button class="filter-tab" [class.active]="filterStatus === 'APPROVED'" (click)="filterStatus = 'APPROVED'">Approuvées</button>
+    <button class="filter-tab" [class.active]="filterStatus === 'REJECTED'" (click)="filterStatus = 'REJECTED'">Rejetées</button>
+  </div>
+
+  <!-- Loading -->
+  @if (loading) {
+    <div class="loading-state">
+      <div class="spinner-border text-primary" role="status"></div>
+      <p>Chargement des demandes…</p>
+    </div>
+  }
+
+  <!-- Empty state -->
+  @if (!loading && filtered.length === 0) {
+    <div class="empty-state">
+      <i class="fas fa-file-invoice-dollar fa-2x"></i>
+      <p>Aucune demande {{ filterStatus !== 'ALL' ? statusLabel(filterStatus) : '' }} pour le moment.</p>
+    </div>
+  }
+
+  <!-- Table -->
+  @if (!loading && filtered.length > 0) {
+    <div class="table-card">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Affilié</th>
+            <th>Zone demandée</th>
+            <th>Montant</th>
+            <th>Preuve de paiement</th>
+            <th>Statut</th>
+            <th>Date</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (req of filtered; track req.id) {
+            <tr [class.row-pending]="req.status === 'PENDING'"
+                [class.row-approved]="req.status === 'APPROVED'"
+                [class.row-rejected]="req.status === 'REJECTED'">
+
+              <!-- ID -->
+              <td class="cell-id">#{{ req.id }}</td>
+
+              <!-- Affiliate -->
+              <td>
+                <div class="affiliate-cell">
+                  <div class="affiliate-avatar">{{ req.affiliateName.charAt(0) }}</div>
+                  <div>
+                    <div class="affiliate-name">{{ req.affiliateName }}</div>
+                    <div class="affiliate-email">{{ req.affiliateEmail }}</div>
+                  </div>
+                </div>
+              </td>
+
+              <!-- Zone -->
+              <td>
+                <div class="zone-cell">
+                  <i class="fas fa-map-marker-alt text-primary"></i>
+                  <div>
+                    <div class="zone-city">{{ req.zoneName }}</div>
+                    <div class="zone-country">{{ req.country }}</div>
+                  </div>
+                  @if (req.isPremium) {
+                    <span class="badge-premium ms-1"><i class="fas fa-crown"></i> Premium</span>
+                  }
+                </div>
+              </td>
+
+              <!-- Amount -->
+              <td>
+                <span class="amount-badge" [class.amount-premium]="req.isPremium">
+                  {{ fmt(req.amount) }}
+                </span>
+              </td>
+
+              <!-- Proof image -->
+              <td class="cell-proof">
+                @if (proofUrls.get(req.id)) {
+                  <button class="proof-thumb-btn" (click)="openImagePreview(req.id)"
+                          title="Voir la preuve">
+                    <img [src]="proofUrls.get(req.id)" alt="preuve" class="proof-thumb" />
+                    <span class="proof-overlay"><i class="fas fa-search-plus"></i></span>
+                  </button>
+                } @else if (req.proofImageUrl) {
+                  <span class="proof-loading"><i class="fas fa-spinner fa-spin"></i></span>
+                } @else {
+                  <span class="text-muted" style="font-size:0.8rem;">—</span>
+                }
+              </td>
+
+              <!-- Status -->
+              <td>
+                <span class="status-badge" [ngClass]="statusClass(req.status)">
+                  {{ statusLabel(req.status) }}
+                </span>
+                @if (req.status === 'REJECTED' && req.rejectionReason) {
+                  <div class="rejection-reason">{{ req.rejectionReason }}</div>
+                }
+                @if (req.status !== 'PENDING' && req.reviewedByName) {
+                  <div class="reviewed-by">par {{ req.reviewedByName }}</div>
+                }
+              </td>
+
+              <!-- Date -->
+              <td class="cell-date">{{ formatDate(req.createdAt) }}</td>
+
+              <!-- Actions -->
+              <td class="cell-actions">
+                @if (req.status === 'PENDING') {
+                  <div class="action-btns">
+                    <button class="btn btn-sm btn-success action-btn" (click)="approve(req)"
+                            [disabled]="actionLoading" title="Approuver">
+                      <i class="fas fa-check"></i>
+                      <span>Approuver</span>
+                    </button>
+                    <button class="btn btn-sm btn-outline-danger action-btn" (click)="openRejectModal(req)"
+                            [disabled]="actionLoading" title="Rejeter">
+                      <i class="fas fa-times"></i>
+                      <span>Rejeter</span>
+                    </button>
+                  </div>
+                } @else {
+                  <span class="text-muted" style="font-size:0.8rem;">—</span>
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+
+</div>
+
+<!-- ── Reject modal ─────────────────────────────────────────────────────────── -->
+@if (rejectModalOpen && selectedRequest) {
+  <div class="modal-overlay" (click)="closeRejectModal()">
+    <div class="modal-panel" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h5><i class="fas fa-times-circle text-danger"></i> Rejeter la demande</h5>
+        <button class="btn-close" (click)="closeRejectModal()"></button>
+      </div>
+      <div class="modal-body">
+
+        <div class="reject-summary">
+          <div class="rs-row">
+            <span class="rs-label">Affilié</span>
+            <span class="rs-value">{{ selectedRequest.affiliateName }}</span>
+          </div>
+          <div class="rs-row">
+            <span class="rs-label">Zone</span>
+            <span class="rs-value">{{ selectedRequest.zoneName }}, {{ selectedRequest.country }}</span>
+          </div>
+          <div class="rs-row">
+            <span class="rs-label">Montant</span>
+            <span class="rs-value">{{ fmt(selectedRequest.amount) }}</span>
+          </div>
+        </div>
+
+        <div class="mb-3 mt-3">
+          <label class="form-label fw-semibold" for="rejectReason">
+            Motif du rejet <span class="text-danger">*</span>
+          </label>
+          <textarea id="rejectReason" class="form-control" rows="3"
+                    [(ngModel)]="rejectionReason"
+                    placeholder="Ex: Montant incorrect, image illisible, virement non reçu…"></textarea>
+        </div>
+
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline-secondary" (click)="closeRejectModal()">Annuler</button>
+        <button class="btn btn-danger" (click)="confirmReject()"
+                [disabled]="actionLoading || !rejectionReason.trim()">
+          @if (actionLoading) {
+            <span class="spinner-border spinner-border-sm me-1"></span>
+          }
+          Confirmer le rejet
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- ── Image preview modal ──────────────────────────────────────────────────── -->
+@if (previewSafeUrl) {
+  <div class="modal-overlay image-preview-overlay" (click)="closeImagePreview()">
+    <div class="image-preview-panel" (click)="$event.stopPropagation()">
+      <button class="image-preview-close" (click)="closeImagePreview()">
+        <i class="fas fa-times"></i>
+      </button>
+      <img [src]="previewSafeUrl" alt="Preuve de paiement" />
+    </div>
+  </div>
+}

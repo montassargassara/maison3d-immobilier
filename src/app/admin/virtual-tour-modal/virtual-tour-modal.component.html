@@ -1,0 +1,206 @@
+<div class="vtm-overlay" (click)="close()">
+  <div class="vtm-panel" (click)="$event.stopPropagation()">
+
+    <!-- Header -->
+    <div class="vtm-header">
+      <div class="vtm-header-icon">
+        <i class="fas fa-vr-cardboard"></i>
+      </div>
+      <div class="vtm-header-text">
+        <h2>Visite Virtuelle 360°</h2>
+        <p>Générez automatiquement une visite immersive à partir d'une vidéo de la propriété</p>
+      </div>
+      <button class="vtm-close" type="button" (click)="close()">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+
+    <!-- ── IDLE / SELECT STATE ── -->
+    <div class="vtm-body" *ngIf="state === 'idle' || state === 'error'">
+
+      <!-- Existing tour info -->
+      <div class="vtm-existing" *ngIf="existingTour && existingTour.status === 'COMPLETED'">
+        <div class="vtm-existing-icon"><i class="fas fa-check-circle"></i></div>
+        <div class="vtm-existing-text">
+          <strong>Visite virtuelle active — {{ existingTour.sceneCount }} scènes</strong>
+          <span>Régénérer remplacera la visite existante.</span>
+        </div>
+        <button class="vtm-btn vtm-btn-danger" type="button" (click)="deleteTour()">
+          <i class="fas fa-trash"></i> Supprimer
+        </button>
+      </div>
+
+      <!-- Pipeline steps -->
+      <div class="vtm-pipeline">
+        <div class="vtm-step">
+          <div class="vtm-step-num">1</div>
+          <div>
+            <strong>Upload vidéo</strong>
+            <span>MP4 · MOV · AVI · MKV · WebM</span>
+          </div>
+        </div>
+        <div class="vtm-step-arrow"><i class="fas fa-chevron-right"></i></div>
+        <div class="vtm-step">
+          <div class="vtm-step-num">2</div>
+          <div>
+            <strong>Analyse FFmpeg</strong>
+            <span>Détection de scènes</span>
+          </div>
+        </div>
+        <div class="vtm-step-arrow"><i class="fas fa-chevron-right"></i></div>
+        <div class="vtm-step">
+          <div class="vtm-step-num">3</div>
+          <div>
+            <strong>Visite générée</strong>
+            <span>Navigation 360° interactive</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Drop zone -->
+      <div
+        class="vtm-dropzone"
+        [class.vtm-drag-over]="isDragOver"
+        [class.vtm-has-file]="!!selectedFile"
+        (dragover)="onDragOver($event)"
+        (dragleave)="onDragLeave($event)"
+        (drop)="onDrop($event)"
+        (click)="!selectedFile && videoInput.click()">
+
+        <!-- Empty state -->
+        <div class="vtm-drop-empty" *ngIf="!selectedFile">
+          <div class="vtm-drop-icon">
+            <i class="fas fa-film"></i>
+          </div>
+          <p class="vtm-drop-title">Glissez votre vidéo ici</p>
+          <p class="vtm-drop-hint">ou cliquez pour sélectionner un fichier</p>
+          <p class="vtm-drop-formats">MP4 &middot; MOV &middot; AVI &middot; MKV &middot; WebM &middot; Max 4 GB</p>
+          <button class="vtm-btn vtm-btn-outline" type="button" (click)="$event.stopPropagation(); videoInput.click()">
+            <i class="fas fa-folder-open"></i> Parcourir
+          </button>
+        </div>
+
+        <!-- File selected state -->
+        <div class="vtm-drop-file" *ngIf="selectedFile">
+          <div class="vtm-file-icon"><i class="fas fa-film"></i></div>
+          <div class="vtm-file-meta">
+            <strong>{{ selectedFile.name }}</strong>
+            <span>{{ fileSizeLabel }}</span>
+          </div>
+          <button class="vtm-remove-btn" type="button" (click)="$event.stopPropagation(); clearFile()" title="Retirer">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+
+        <input #videoInput type="file" accept="video/mp4,video/quicktime,video/x-msvideo,video/x-matroska,video/webm,.mp4,.mov,.avi,.mkv,.webm" hidden (change)="onFileSelected($event)">
+      </div>
+
+      <!-- Error banner -->
+      <div class="vtm-error-banner" *ngIf="state === 'error'">
+        <i class="fas fa-triangle-exclamation"></i>
+        <span>{{ errorMessage }}</span>
+      </div>
+
+      <!-- 360° toggle -->
+      <div class="vtm-toggle-row">
+        <label class="vtm-toggle-label">
+          <input type="checkbox" [(ngModel)]="is360">
+          <span class="vtm-toggle-switch"></span>
+          <span>Vidéo 360° (caméra équirectangulaire)</span>
+        </label>
+        <span class="vtm-toggle-hint">Activez si votre vidéo a été filmée avec une caméra 360°</span>
+      </div>
+
+      <!-- Action -->
+      <div class="vtm-actions">
+        <button class="vtm-btn vtm-btn-ghost" type="button" (click)="close()">Annuler</button>
+        <button
+          class="vtm-btn vtm-btn-primary"
+          type="button"
+          [disabled]="!selectedFile"
+          (click)="startGeneration()">
+          <i class="fas fa-wand-magic-sparkles"></i>
+          Générer la visite virtuelle
+        </button>
+      </div>
+    </div>
+
+    <!-- ── UPLOADING STATE ── -->
+    <div class="vtm-body vtm-body-center" *ngIf="state === 'uploading'">
+      <div class="vtm-processing-icon vtm-icon-upload">
+        <i class="fas fa-cloud-arrow-up"></i>
+      </div>
+      <h3 class="vtm-processing-title">Envoi de la vidéo…</h3>
+      <p class="vtm-processing-sub">{{ selectedFile?.name }}</p>
+      <div class="vtm-progress-track">
+        <div class="vtm-progress-fill" [style.width.%]="uploadPercent">
+          <span class="vtm-progress-glow"></span>
+        </div>
+      </div>
+      <span class="vtm-progress-pct">{{ uploadPercent }}%</span>
+    </div>
+
+    <!-- ── PROCESSING STATE ── -->
+    <div class="vtm-body vtm-body-center" *ngIf="state === 'processing'">
+      <div class="vtm-processing-icon vtm-icon-spin">
+        <i class="fas fa-cog fa-spin"></i>
+      </div>
+      <h3 class="vtm-processing-title">Génération en cours…</h3>
+      <p class="vtm-processing-sub">FFmpeg analyse la vidéo et extrait les scènes</p>
+      <div class="vtm-steps-live">
+        <div class="vtm-live-step" [class.active]="processingPercent >= 5">
+          <i class="fas fa-check-circle"></i> Vidéo reçue
+        </div>
+        <div class="vtm-live-step" [class.active]="processingPercent >= 30">
+          <i class="fas fa-check-circle"></i> Détection des scènes
+        </div>
+        <div class="vtm-live-step" [class.active]="processingPercent >= 70">
+          <i class="fas fa-check-circle"></i> Extraction des images
+        </div>
+        <div class="vtm-live-step" [class.active]="processingPercent >= 90">
+          <i class="fas fa-check-circle"></i> Génération des miniatures
+        </div>
+        <div class="vtm-live-step" [class.active]="processingPercent >= 100">
+          <i class="fas fa-check-circle"></i> Finalisation
+        </div>
+      </div>
+      <div class="vtm-progress-track">
+        <div class="vtm-progress-fill" [style.width.%]="processingPercent">
+          <span class="vtm-progress-glow"></span>
+        </div>
+      </div>
+      <span class="vtm-progress-pct">{{ processingPercent }}%</span>
+      <p class="vtm-processing-note">
+        <i class="fas fa-info-circle"></i>
+        Cela peut prendre quelques minutes selon la durée de la vidéo.
+      </p>
+    </div>
+
+    <!-- ── SUCCESS STATE ── -->
+    <div class="vtm-body vtm-body-center" *ngIf="state === 'success' && generatedTour">
+      <div class="vtm-success-icon">
+        <i class="fas fa-check-circle"></i>
+      </div>
+      <h3 class="vtm-success-title">Visite virtuelle générée !</h3>
+      <p class="vtm-success-sub">
+        <strong>{{ generatedTour.sceneCount }} scènes</strong> ont été créées depuis votre vidéo.
+      </p>
+
+      <!-- Scene thumbnails preview -->
+      <div class="vtm-thumb-grid" *ngIf="generatedTour.scenes.length">
+        <div class="vtm-thumb" *ngFor="let scene of generatedTour.scenes; let i = index">
+          <img [src]="scene.thumbnailUrl || scene.imageUrl" [alt]="scene.sceneName" loading="lazy">
+          <span>{{ scene.sceneName }}</span>
+        </div>
+      </div>
+
+      <div class="vtm-actions">
+        <button class="vtm-btn vtm-btn-ghost" type="button" (click)="close()">Fermer</button>
+        <button class="vtm-btn vtm-btn-primary" type="button" (click)="close()">
+          <i class="fas fa-eye"></i> Voir la visite
+        </button>
+      </div>
+    </div>
+
+  </div>
+</div>

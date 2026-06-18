@@ -1,0 +1,612 @@
+<div class="txn-page">
+
+  <!-- Header -->
+  <div class="txn-header">
+    <div>
+      <h1 class="txn-title"><i class="fas fa-key"></i> Transactions &amp; Location</h1>
+      <p class="txn-subtitle">
+        @if (isSuperAdmin) {
+          Vue globale — vos locations + locations des agences partenaires.
+        } @else {
+          Historique des biens loués et revenus locatifs générés par votre agence.
+        }
+      </p>
+    </div>
+    <button class="btn btn-outline-secondary btn-sm" (click)="load()">
+      <i class="fas fa-sync-alt"></i> Actualiser
+    </button>
+  </div>
+
+  <!-- Error -->
+  @if (errorMessage) {
+    <div class="alert alert-danger d-flex align-items-center gap-2">
+      <i class="fas fa-exclamation-circle"></i> {{ errorMessage }}
+    </div>
+  }
+
+  <!-- ════════════════════════════════════════════════════════════════════
+       SUPER_ADMIN — SECTIONED VIEW
+       ════════════════════════════════════════════════════════════════════ -->
+  @if (isSuperAdmin) {
+
+    <!-- Global KPIs -->
+    <div class="kpi-row">
+      <div class="kpi-card">
+        <div class="kpi-icon kpi-total"><i class="fas fa-home"></i></div>
+        <div>
+          <div class="kpi-value">{{ properties.length }}</div>
+          <div class="kpi-label">Total locations</div>
+        </div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-icon kpi-own"><i class="fas fa-shield-alt"></i></div>
+        <div>
+          <div class="kpi-value">{{ ownProperties.length }}</div>
+          <div class="kpi-label">Mes biens loués</div>
+        </div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-icon kpi-agency"><i class="fas fa-building"></i></div>
+        <div>
+          <div class="kpi-value">{{ agencyProperties.length }}</div>
+          <div class="kpi-label">Locations agences ({{ agencyCount }} agence{{ agencyCount > 1 ? 's' : '' }})</div>
+        </div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-icon kpi-active"><i class="fas fa-check-circle"></i></div>
+        <div>
+          <div class="kpi-value">{{ activeRentals }}</div>
+          <div class="kpi-label">Locations actives</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="txn-filters">
+      <div class="filter-field">
+        <i class="fas fa-search"></i>
+        <input type="text" placeholder="Rechercher…" [(ngModel)]="searchTerm" />
+      </div>
+      <select [(ngModel)]="typeFilter">
+        <option value="">Tous les types</option>
+        @for (t of availableTypes; track t) {
+          <option [value]="t">{{ t }}</option>
+        }
+      </select>
+      <select [(ngModel)]="cityFilter">
+        <option value="">Toutes les villes</option>
+        @for (c of availableCities; track c) {
+          <option [value]="c">{{ c }}</option>
+        }
+      </select>
+      @if (searchTerm || typeFilter || cityFilter || agencyFilter) {
+        <button class="btn btn-sm btn-outline-secondary" (click)="resetFilters()">
+          <i class="fas fa-times"></i> Réinitialiser
+        </button>
+      }
+    </div>
+
+    <!-- Loading -->
+    @if (loading) {
+      <div class="txn-loading">
+        <div class="spinner-border text-primary" role="status"></div>
+        <p>Chargement des locations…</p>
+      </div>
+    }
+
+    @if (!loading) {
+
+      <!-- ── Section 1 : Mes locations ──────────────────────────────────── -->
+      <div class="txn-section">
+        <div class="section-header section-header-own">
+          <div class="section-title-group">
+            <span class="section-icon"><i class="fas fa-shield-alt"></i></span>
+            <div>
+              <h2 class="section-title">Mes locations</h2>
+              <span class="section-sub">Biens SUPER_ADMIN_OWNED actuellement loués</span>
+            </div>
+          </div>
+          <div class="section-kpis">
+            <div class="skpi">
+              <span class="skpi-val">{{ ownProperties.length }}</span>
+              <span class="skpi-lbl">biens</span>
+            </div>
+            <div class="skpi">
+              <span class="skpi-val">{{ ownActiveRentals }}</span>
+              <span class="skpi-lbl">actives</span>
+            </div>
+            <div class="skpi">
+              <span class="skpi-val">{{ fmt(ownRevenue) }}</span>
+              <span class="skpi-lbl">loyer / mois</span>
+            </div>
+          </div>
+        </div>
+
+        @if (ownProperties.length === 0) {
+          <div class="txn-empty txn-empty-sm">
+            <i class="fas fa-key"></i>
+            <span>Aucun de vos biens n'est actuellement loué.</span>
+          </div>
+        } @else if (filteredOwn.length === 0) {
+          <div class="txn-empty txn-empty-sm">
+            <i class="fas fa-search"></i>
+            <span>Aucun résultat pour ces filtres.</span>
+          </div>
+        } @else {
+          <div class="txn-table-wrap">
+            <table class="txn-table">
+              <thead>
+                <tr>
+                  <th>Bien</th>
+                  <th>Type</th>
+                  <th>Localisation</th>
+                  <th>Loyer / mois</th>
+                  <th>Durée</th>
+                  <th>Statut location</th>
+                  <th>Début location</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (p of filteredOwn; track p.id) {
+                  <tr>
+                    <td>
+                      <div class="prop-cell">
+                        @if (imageUrl(p)) {
+                          <img [src]="imageUrl(p)!" alt="" class="prop-thumb" />
+                        } @else {
+                          <div class="prop-thumb prop-thumb-placeholder"><i class="fas fa-home"></i></div>
+                        }
+                        <div>
+                          <div class="prop-title">{{ p.titre }}</div>
+                          <div class="prop-ref">#{{ p.id }}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td><span class="type-badge type-badge-location">{{ p.type }}</span></td>
+                    <td>
+                      <div class="location-cell">
+                        <i class="fas fa-map-marker-alt text-primary me-1"></i>
+                        {{ p.city || '—' }}@if (p.country) {, {{ p.country }}}
+                      </div>
+                      <div class="address-sub">{{ p.adresse }}</div>
+                    </td>
+                    <td><span class="price-badge price-badge-location">{{ fmt(p.prixLocation) }}</span></td>
+                    <td class="date-cell">
+                      @if (p.rentalDurationMonths) { {{ p.rentalDurationMonths }} mois } @else { — }
+                    </td>
+                    <td>
+                      <span class="rental-badge" [ngClass]="rentalStatus(p).cls">
+                        {{ rentalStatus(p).label }}
+                      </span>
+                    </td>
+                    <td class="date-cell">{{ formatDate(p.updatedAt) }}</td>
+                    <td>
+                      <div class="d-flex gap-1">
+                        <button class="btn btn-sm btn-outline-info" (click)="openTxnDetail(p)" title="Voir détails">
+                          <i class="fas fa-info-circle"></i>
+                        </button>
+                        <a [routerLink]="['/admin/properties', p.id]" class="btn btn-sm btn-outline-secondary">
+                          <i class="fas fa-eye"></i>
+                        </a>
+                      </div>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+          <div class="txn-count">{{ filteredOwn.length }} location{{ filteredOwn.length > 1 ? 's' : '' }}</div>
+        }
+      </div>
+
+      <!-- ── Section 2 : Locations agences partenaires ──────────────────── -->
+      <div class="txn-section">
+        <div class="section-header section-header-agency">
+          <div class="section-title-group">
+            <span class="section-icon"><i class="fas fa-building"></i></span>
+            <div>
+              <h2 class="section-title">Locations agences partenaires</h2>
+              <span class="section-sub">Biens loués par les agences sur la plateforme</span>
+            </div>
+          </div>
+          <div class="section-kpis">
+            <div class="skpi">
+              <span class="skpi-val">{{ agencyProperties.length }}</span>
+              <span class="skpi-lbl">biens</span>
+            </div>
+            <div class="skpi">
+              <span class="skpi-val">{{ agencyActiveRentals }}</span>
+              <span class="skpi-lbl">actives</span>
+            </div>
+            <div class="skpi">
+              <span class="skpi-val">{{ fmt(agencyRevenue) }}</span>
+              <span class="skpi-lbl">loyers / mois</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Agency filter -->
+        @if (availableAgencies.length > 1) {
+          <div class="agency-filter-row">
+            <i class="fas fa-filter text-muted"></i>
+            <select [(ngModel)]="agencyFilter" class="agency-select">
+              <option value="">Toutes les agences ({{ agencyCount }})</option>
+              @for (ag of availableAgencies; track ag) {
+                <option [value]="ag">{{ ag }}</option>
+              }
+            </select>
+          </div>
+        }
+
+        @if (agencyProperties.length === 0) {
+          <div class="txn-empty txn-empty-sm">
+            <i class="fas fa-building"></i>
+            <span>Aucune agence n'a encore de bien loué.</span>
+          </div>
+        } @else if (filteredAgency.length === 0) {
+          <div class="txn-empty txn-empty-sm">
+            <i class="fas fa-search"></i>
+            <span>Aucun résultat pour ces filtres.</span>
+          </div>
+        } @else {
+          <div class="txn-table-wrap">
+            <table class="txn-table">
+              <thead>
+                <tr>
+                  <th>Bien</th>
+                  <th>Type</th>
+                  <th>Localisation</th>
+                  <th>Loyer / mois</th>
+                  <th>Durée</th>
+                  <th>Statut location</th>
+                  <th>Agence</th>
+                  <th>Début location</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (p of filteredAgency; track p.id) {
+                  <tr>
+                    <td>
+                      <div class="prop-cell">
+                        @if (imageUrl(p)) {
+                          <img [src]="imageUrl(p)!" alt="" class="prop-thumb" />
+                        } @else {
+                          <div class="prop-thumb prop-thumb-placeholder"><i class="fas fa-home"></i></div>
+                        }
+                        <div>
+                          <div class="prop-title">{{ p.titre }}</div>
+                          <div class="prop-ref">#{{ p.id }}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td><span class="type-badge type-badge-location">{{ p.type }}</span></td>
+                    <td>
+                      <div class="location-cell">
+                        <i class="fas fa-map-marker-alt text-primary me-1"></i>
+                        {{ p.city || '—' }}@if (p.country) {, {{ p.country }}}
+                      </div>
+                      <div class="address-sub">{{ p.adresse }}</div>
+                    </td>
+                    <td><span class="price-badge price-badge-location">{{ fmt(p.prixLocation) }}</span></td>
+                    <td class="date-cell">
+                      @if (p.rentalDurationMonths) { {{ p.rentalDurationMonths }} mois } @else { — }
+                    </td>
+                    <td>
+                      <span class="rental-badge" [ngClass]="rentalStatus(p).cls">
+                        {{ rentalStatus(p).label }}
+                      </span>
+                    </td>
+                    <td>
+                      <span class="agency-badge">
+                        <i class="fas fa-building me-1"></i>{{ p.agencyAdminName || 'Agence' }}
+                      </span>
+                    </td>
+                    <td class="date-cell">{{ formatDate(p.updatedAt) }}</td>
+                    <td>
+                      <div class="d-flex gap-1">
+                        <button class="btn btn-sm btn-outline-info" (click)="openTxnDetail(p)" title="Voir détails">
+                          <i class="fas fa-info-circle"></i>
+                        </button>
+                        <a [routerLink]="['/admin/properties', p.id]" class="btn btn-sm btn-outline-secondary">
+                          <i class="fas fa-eye"></i>
+                        </a>
+                      </div>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+          <div class="txn-count">{{ filteredAgency.length }} location{{ filteredAgency.length > 1 ? 's' : '' }}</div>
+        }
+      </div>
+
+    }<!-- /!loading -->
+
+  } @else {
+
+    <!-- ════════════════════════════════════════════════════════════════════
+         ADMIN / RESPONSABLE / COMMERCIAL — SINGLE-AGENCY VIEW
+         ════════════════════════════════════════════════════════════════════ -->
+
+    <!-- KPI cards -->
+    <div class="kpi-row">
+      <div class="kpi-card">
+        <div class="kpi-icon kpi-total"><i class="fas fa-home"></i></div>
+        <div>
+          <div class="kpi-value">{{ properties.length }}</div>
+          <div class="kpi-label">Biens loués</div>
+        </div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-icon kpi-active"><i class="fas fa-check-circle"></i></div>
+        <div>
+          <div class="kpi-value">{{ activeRentals }}</div>
+          <div class="kpi-label">Locations actives</div>
+        </div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-icon kpi-revenue"><i class="fas fa-coins"></i></div>
+        <div>
+          <div class="kpi-value">{{ fmt(totalRevenue) }}</div>
+          <div class="kpi-label">Revenu mensuel total</div>
+        </div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-icon kpi-avg"><i class="fas fa-calculator"></i></div>
+        <div>
+          <div class="kpi-value">{{ fmt(avgPrice) }}</div>
+          <div class="kpi-label">Loyer moyen</div>
+        </div>
+      </div>
+      @if (cityBreakdown.length > 0) {
+        <div class="kpi-card">
+          <div class="kpi-icon kpi-city"><i class="fas fa-map-marker-alt"></i></div>
+          <div>
+            <div class="kpi-value">{{ cityBreakdown[0].city }}</div>
+            <div class="kpi-label">Ville la + active ({{ cityBreakdown[0].count }} locations)</div>
+          </div>
+        </div>
+      }
+    </div>
+
+    <!-- Breakdowns -->
+    @if (properties.length > 0) {
+      <div class="breakdown-row">
+        <div class="breakdown-card">
+          <h3 class="breakdown-title"><i class="fas fa-home me-2"></i>Par type</h3>
+          @for (row of typeBreakdown; track row.type) {
+            <div class="breakdown-item">
+              <span class="bd-label">{{ row.type }}</span>
+              <div class="bd-bar-wrap">
+                <div class="bd-bar bd-bar-location" [style.width.%]="(row.count / properties.length) * 100"></div>
+              </div>
+              <span class="bd-count">{{ row.count }}</span>
+            </div>
+          }
+        </div>
+        <div class="breakdown-card">
+          <h3 class="breakdown-title"><i class="fas fa-city me-2"></i>Top villes</h3>
+          @for (row of cityBreakdown; track row.city) {
+            <div class="breakdown-item">
+              <span class="bd-label">{{ row.city }}</span>
+              <div class="bd-bar-wrap">
+                <div class="bd-bar bd-bar-location" [style.width.%]="(row.count / properties.length) * 100"></div>
+              </div>
+              <span class="bd-count">{{ row.count }}</span>
+            </div>
+          }
+        </div>
+      </div>
+    }
+
+    <!-- Filters -->
+    <div class="txn-filters">
+      <div class="filter-field">
+        <i class="fas fa-search"></i>
+        <input type="text" placeholder="Rechercher…" [(ngModel)]="searchTerm" />
+      </div>
+      <select [(ngModel)]="typeFilter">
+        <option value="">Tous les types</option>
+        @for (t of availableTypes; track t) {
+          <option [value]="t">{{ t }}</option>
+        }
+      </select>
+      <select [(ngModel)]="cityFilter">
+        <option value="">Toutes les villes</option>
+        @for (c of availableCities; track c) {
+          <option [value]="c">{{ c }}</option>
+        }
+      </select>
+      @if (searchTerm || typeFilter || cityFilter) {
+        <button class="btn btn-sm btn-outline-secondary" (click)="resetFilters()">
+          <i class="fas fa-times"></i> Réinitialiser
+        </button>
+      }
+    </div>
+
+    <!-- Loading -->
+    @if (loading) {
+      <div class="txn-loading">
+        <div class="spinner-border text-primary" role="status"></div>
+        <p>Chargement des locations…</p>
+      </div>
+    }
+
+    <!-- Empty state -->
+    @if (!loading && properties.length === 0) {
+      <div class="txn-empty">
+        <i class="fas fa-key fa-3x mb-3"></i>
+        <h3>Aucune location active</h3>
+        <p>Les biens dont le statut est <strong>LOUÉ</strong> apparaîtront ici.</p>
+      </div>
+    }
+
+    @if (!loading && filtered.length === 0 && properties.length > 0) {
+      <div class="txn-empty">
+        <i class="fas fa-search fa-2x mb-2"></i>
+        <p>Aucun résultat pour ces filtres.</p>
+      </div>
+    }
+
+    @if (!loading && filtered.length > 0) {
+      <div class="txn-table-wrap">
+        <table class="txn-table">
+          <thead>
+            <tr>
+              <th>Bien</th>
+              <th>Type</th>
+              <th>Localisation</th>
+              <th>Loyer / mois</th>
+              <th>Durée</th>
+              <th>Statut location</th>
+              <th>Début location</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (p of filtered; track p.id) {
+              <tr>
+                <td>
+                  <div class="prop-cell">
+                    @if (imageUrl(p)) {
+                      <img [src]="imageUrl(p)!" alt="" class="prop-thumb" />
+                    } @else {
+                      <div class="prop-thumb prop-thumb-placeholder"><i class="fas fa-home"></i></div>
+                    }
+                    <div>
+                      <div class="prop-title">{{ p.titre }}</div>
+                      <div class="prop-ref">#{{ p.id }}</div>
+                    </div>
+                  </div>
+                </td>
+                <td><span class="type-badge type-badge-location">{{ p.type }}</span></td>
+                <td>
+                  <div class="location-cell">
+                    <i class="fas fa-map-marker-alt text-primary me-1"></i>
+                    {{ p.city || '—' }}@if (p.country) {, {{ p.country }}}
+                  </div>
+                  <div class="address-sub">{{ p.adresse }}</div>
+                </td>
+                <td><span class="price-badge price-badge-location">{{ fmt(p.prixLocation) }}</span></td>
+                <td class="date-cell">
+                  @if (p.rentalDurationMonths) { {{ p.rentalDurationMonths }} mois } @else { — }
+                </td>
+                <td>
+                  <span class="rental-badge" [ngClass]="rentalStatus(p).cls">
+                    {{ rentalStatus(p).label }}
+                  </span>
+                </td>
+                <td class="date-cell">{{ formatDate(p.updatedAt) }}</td>
+                <td>
+                  <div class="d-flex gap-1">
+                    <button class="btn btn-sm btn-outline-info" (click)="openTxnDetail(p)" title="Voir détails">
+                      <i class="fas fa-info-circle"></i>
+                    </button>
+                    <a [routerLink]="['/admin/properties', p.id]" class="btn btn-sm btn-outline-secondary">
+                      <i class="fas fa-eye"></i>
+                    </a>
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      <div class="txn-count">
+        {{ filtered.length }} location{{ filtered.length > 1 ? 's' : '' }}
+        @if (filtered.length !== properties.length) {
+          <span class="text-muted"> ({{ properties.length }} au total)</span>
+        }
+      </div>
+    }
+
+  }<!-- /isSuperAdmin else -->
+
+</div>
+
+<!-- ══ Location detail overlay ═════════════════════════════════════════════ -->
+@if (selectedTxnProperty) {
+  <div class="modal d-block" style="background:rgba(0,0,0,.5);" (click)="closeTxnDetail()">
+    <div class="modal-dialog modal-lg" (click)="$event.stopPropagation()">
+      <div class="modal-content">
+        <div class="modal-header" style="background:linear-gradient(135deg,#0d6efd,#0dcaf0);color:#fff;">
+          <h5 class="modal-title"><i class="fas fa-key me-2"></i>Détails de la location</h5>
+          <button type="button" class="btn-close btn-close-white" (click)="closeTxnDetail()"></button>
+        </div>
+        <div class="modal-body">
+          <div class="row g-4">
+
+            <!-- BIEN -->
+            <div class="col-md-6">
+              <h6 class="fw-bold text-primary mb-3"><i class="fas fa-home me-2"></i>Bien immobilier</h6>
+              <dl class="row mb-0">
+                <dt class="col-sm-4 text-muted">Titre</dt>
+                <dd class="col-sm-8">{{ selectedTxnProperty.titre }}</dd>
+                <dt class="col-sm-4 text-muted">Type</dt>
+                <dd class="col-sm-8"><span class="badge bg-secondary">{{ selectedTxnProperty.type }}</span></dd>
+                <dt class="col-sm-4 text-muted">Localisation</dt>
+                <dd class="col-sm-8">{{ selectedTxnProperty.city || '—' }}@if (selectedTxnProperty.country) {, {{ selectedTxnProperty.country }}}</dd>
+                <dt class="col-sm-4 text-muted">Adresse</dt>
+                <dd class="col-sm-8">{{ selectedTxnProperty.adresse }}</dd>
+              </dl>
+            </div>
+
+            <!-- CONTRAT DE LOCATION -->
+            <div class="col-md-6">
+              <h6 class="fw-bold text-info mb-3"><i class="fas fa-file-contract me-2"></i>Contrat de location</h6>
+              <dl class="row mb-0">
+                <dt class="col-sm-5 text-muted">Loyer / mois</dt>
+                <dd class="col-sm-7 fw-bold text-primary">{{ fmt(selectedTxnProperty.prixLocation) }}</dd>
+                @if (selectedTxnProperty.rentalDurationMonths) {
+                  <dt class="col-sm-5 text-muted">Durée</dt>
+                  <dd class="col-sm-7">{{ selectedTxnProperty.rentalDurationMonths }} mois</dd>
+                }
+                @if (selectedTxnProperty.rentalEndDate) {
+                  <dt class="col-sm-5 text-muted">Fin contrat</dt>
+                  <dd class="col-sm-7">{{ formatDate(selectedTxnProperty.rentalEndDate) }}</dd>
+                }
+                <dt class="col-sm-5 text-muted">Début location</dt>
+                <dd class="col-sm-7">{{ formatDate(selectedTxnProperty.updatedAt) }}</dd>
+                <dt class="col-sm-5 text-muted">Statut</dt>
+                <dd class="col-sm-7">
+                  <span class="badge" [ngClass]="rentalStatus(selectedTxnProperty).cls">
+                    {{ rentalStatus(selectedTxnProperty).label }}
+                  </span>
+                </dd>
+                @if (selectedTxnProperty.agencyAdminName) {
+                  <dt class="col-sm-5 text-muted">Agence</dt>
+                  <dd class="col-sm-7">{{ selectedTxnProperty.agencyAdminName }}</dd>
+                }
+              </dl>
+            </div>
+
+            <!-- LOCATAIRE -->
+            <div class="col-12">
+              <h6 class="fw-bold text-warning mb-3"><i class="fas fa-user me-2"></i>Locataire</h6>
+              @if (selectedTxnProperty.buyerName) {
+                <dl class="row mb-0">
+                  <dt class="col-sm-3 text-muted">Nom</dt>
+                  <dd class="col-sm-9">{{ selectedTxnProperty.buyerName }}</dd>
+                  <dt class="col-sm-3 text-muted">ID client</dt>
+                  <dd class="col-sm-9">#{{ selectedTxnProperty.buyerId }}</dd>
+                </dl>
+              } @else {
+                <p class="text-muted fst-italic mb-0">Aucun locataire enregistré pour ce bien.</p>
+              }
+            </div>
+
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" (click)="closeTxnDetail()">Fermer</button>
+          <a [routerLink]="['/admin/properties', selectedTxnProperty.id]" class="btn btn-primary" (click)="closeTxnDetail()">
+            <i class="fas fa-external-link-alt me-2"></i>Voir le bien
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+}

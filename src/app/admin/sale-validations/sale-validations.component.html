@@ -1,0 +1,244 @@
+<!-- sale-validations.component.html -->
+<div class="sv-page">
+
+  <!-- Alerts -->
+  <div class="sv-alert sv-alert-success" *ngIf="successMessage">
+    <i class="fas fa-check-circle"></i>
+    <span>{{ successMessage }}</span>
+    <button class="sv-alert-close" (click)="clearMessages()"><i class="fas fa-times"></i></button>
+  </div>
+  <div class="sv-alert sv-alert-error" *ngIf="errorMessage">
+    <i class="fas fa-exclamation-circle"></i>
+    <span>{{ errorMessage }}</span>
+    <button class="sv-alert-close" (click)="clearMessages()"><i class="fas fa-times"></i></button>
+  </div>
+
+  <!-- Tabs -->
+  <div class="sv-tabs">
+    <button class="sv-tab" [class.active]="activeTab === 'pending'" (click)="activeTab = 'pending'">
+      <i class="fas fa-clock"></i>
+      Validations à traiter
+      <span class="sv-tab-badge" *ngIf="pendingList.length > 0">{{ pendingList.length }}</span>
+    </button>
+    <button class="sv-tab" [class.active]="activeTab === 'sent'" (click)="activeTab = 'sent'">
+      <i class="fas fa-paper-plane"></i>
+      Mes demandes envoyées
+      <span class="sv-tab-badge" *ngIf="myRequests.length > 0">{{ myRequests.length }}</span>
+    </button>
+    <button class="sv-refresh" (click)="load()" title="Actualiser">
+      <i class="fas fa-rotate-right" [class.spin]="loading"></i>
+    </button>
+  </div>
+
+  <!-- Loading -->
+  <div class="sv-loading" *ngIf="loading">
+    <div class="sv-spinner"></div>
+    <span>Chargement…</span>
+  </div>
+
+  <!-- ── PENDING TAB ─────────────────────────────────────────────────────── -->
+  <div class="sv-tab-content" *ngIf="!loading && activeTab === 'pending'">
+
+    <div class="sv-empty" *ngIf="pendingList.length === 0">
+      <i class="fas fa-check-circle sv-empty-icon"></i>
+      <p>Aucune validation en attente.</p>
+      <small>Toutes les demandes de vente/location ont été traitées.</small>
+    </div>
+
+    <div class="sv-cards" *ngIf="pendingList.length > 0">
+      <div class="sv-card" *ngFor="let item of pendingList">
+
+        <div class="sv-card-thumb">
+          <img *ngIf="imageUrl(item.propertyMainImageUrl) as src"
+               [src]="src" [alt]="item.propertyTitle"
+               (error)="$any($event.target).style.display='none'; $any($event.target).nextElementSibling.style.display='flex'">
+          <div class="sv-card-thumb-fallback"
+               [style.display]="imageUrl(item.propertyMainImageUrl) ? 'none' : 'flex'">
+            <i class="fas fa-home"></i>
+          </div>
+          <span class="sv-tx-badge" [ngClass]="getTransactionClass(item)">{{ getTransactionLabel(item) }}</span>
+        </div>
+
+        <div class="sv-card-body">
+          <div class="sv-card-prop">
+            <span class="sv-prop-title">{{ item.propertyTitle }}</span>
+            <span class="sv-prop-loc" *ngIf="item.propertyCity">
+              <i class="fas fa-map-marker-alt"></i> {{ item.propertyCity }}<span *ngIf="item.propertyCountry">, {{ item.propertyCountry }}</span>
+            </span>
+          </div>
+
+          <div class="sv-card-meta">
+            <div class="sv-meta-row">
+              <i class="fas fa-user-tie sv-meta-icon"></i>
+              <div>
+                <div class="sv-meta-label">Demandé par</div>
+                <div class="sv-meta-value">{{ item.requesterName }}</div>
+                <div class="sv-meta-sub">{{ item.requesterEmail }}</div>
+              </div>
+            </div>
+            <div class="sv-meta-row">
+              <i class="fas fa-user sv-meta-icon"></i>
+              <div>
+                <div class="sv-meta-label">Acheteur / Locataire</div>
+                <div class="sv-meta-value">{{ getBuyerDisplay(item) }}</div>
+                <div class="sv-meta-sub" *ngIf="item.clientEmail">{{ item.clientEmail }}</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="sv-rental-info" *ngIf="item.targetStatus === 'LOUE' && item.rentalStartDate">
+            <i class="fas fa-calendar-days"></i>
+            Début : {{ item.rentalStartDate | date:'dd/MM/yyyy' }}
+            <span *ngIf="item.rentalDurationMonths"> · {{ item.rentalDurationMonths }} mois</span>
+            <span *ngIf="item.rentalAmount"> · {{ item.rentalAmount | number:'1.0-0' }} TND/mois</span>
+          </div>
+
+          <div class="sv-price" *ngIf="item.targetStatus === 'VENDU' && item.propertyPrixVente">
+            Prix de vente : <strong>{{ item.propertyPrixVente | number:'1.0-0' }} TND</strong>
+          </div>
+        </div>
+
+        <div class="sv-card-actions">
+          <div class="sv-card-date">
+            <i class="fas fa-clock"></i>
+            {{ item.createdAt | date:'dd/MM/yyyy HH:mm' }}
+          </div>
+          <button class="sv-btn sv-btn-approve" (click)="openApprove(item)">
+            <i class="fas fa-check"></i> Approuver
+          </button>
+          <button class="sv-btn sv-btn-reject" (click)="openReject(item)">
+            <i class="fas fa-times"></i> Refuser
+          </button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ── SENT REQUESTS TAB ───────────────────────────────────────────────── -->
+  <div class="sv-tab-content" *ngIf="!loading && activeTab === 'sent'">
+
+    <div class="sv-empty" *ngIf="myRequests.length === 0">
+      <i class="fas fa-inbox sv-empty-icon"></i>
+      <p>Aucune demande envoyée.</p>
+      <small>Vos demandes de validation de vente/location apparaîtront ici.</small>
+    </div>
+
+    <div class="sv-table-wrap" *ngIf="myRequests.length > 0">
+      <table class="sv-table">
+        <thead>
+          <tr>
+            <th>Bien</th>
+            <th>Type</th>
+            <th>Acheteur</th>
+            <th>Envoyée le</th>
+            <th>Statut</th>
+            <th>Motif refus</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let item of myRequests">
+            <td>
+              <div class="sv-table-prop">
+                <span class="sv-table-title">{{ item.propertyTitle }}</span>
+                <span class="sv-table-loc" *ngIf="item.propertyCity">
+                  <i class="fas fa-map-marker-alt"></i> {{ item.propertyCity }}
+                </span>
+              </div>
+            </td>
+            <td><span class="sv-tx-badge" [ngClass]="getTransactionClass(item)">{{ getTransactionLabel(item) }}</span></td>
+            <td>{{ getBuyerDisplay(item) }}</td>
+            <td>{{ item.createdAt | date:'dd/MM/yy' }}</td>
+            <td><span class="sv-status" [ngClass]="getStatusClass(item.status)">{{ getStatusLabel(item.status) }}</span></td>
+            <td class="sv-table-reason">{{ item.rejectionReason || '—' }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<!-- ── APPROVE CONFIRM MODAL ──────────────────────────────────────────────── -->
+<div class="sv-modal-overlay" *ngIf="approveModalOpen" (click)="closeModals()">
+  <div class="sv-modal" (click)="$event.stopPropagation()">
+    <div class="sv-modal-header sv-modal-header-approve">
+      <i class="fas fa-circle-check"></i>
+      <h3>Confirmer l'approbation</h3>
+    </div>
+    <div class="sv-modal-body" *ngIf="approveTarget">
+      <p>
+        Vous allez approuver la <strong>{{ getTransactionLabel(approveTarget) | lowercase }}</strong>
+        du bien <strong>« {{ approveTarget.propertyTitle }} »</strong>
+        au profit de <strong>{{ getBuyerDisplay(approveTarget) }}</strong>.
+      </p>
+      <p class="sv-modal-warning">
+        <i class="fas fa-triangle-exclamation"></i>
+        Cette action est <strong>irréversible</strong>. Le bien sera marqué
+        <span *ngIf="approveTarget.targetStatus === 'VENDU'">VENDU</span>
+        <span *ngIf="approveTarget.targetStatus === 'LOUE'">LOUÉ</span>
+        et tous les leads actifs sur ce bien seront automatiquement refusés.
+      </p>
+
+      <div class="sv-form-grid">
+        <label class="sv-label">
+          Prix final {{ approveTarget.targetStatus === 'VENDU' ? 'de vente' : 'de location' }}
+          <span class="sv-required">*</span>
+        </label>
+        <input class="sv-input" type="number" min="1" step="any"
+               [(ngModel)]="approveFinalPrice"
+               placeholder="Prix final négocié (TND)" />
+
+        <label class="sv-label">
+          Commission commercial (%) <span class="sv-required">*</span>
+        </label>
+        <input class="sv-input" type="number" min="0" step="any"
+               [(ngModel)]="approveCommission"
+               placeholder="Ex : 2.5" />
+
+        <p class="sv-modal-hint" *ngIf="!approveValid">
+          <i class="fas fa-circle-info"></i>
+          Le prix final et le pourcentage de commission sont obligatoires
+          pour valider la transaction.
+        </p>
+      </div>
+    </div>
+    <div class="sv-modal-footer">
+      <button class="sv-btn sv-btn-ghost" (click)="closeModals()" [disabled]="actionLoading">Annuler</button>
+      <button class="sv-btn sv-btn-approve-lg" (click)="confirmApprove()"
+              [disabled]="actionLoading || !approveValid">
+        <i class="fas fa-check" *ngIf="!actionLoading"></i>
+        <i class="fas fa-spinner fa-spin" *ngIf="actionLoading"></i>
+        Approuver
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ── REJECT MODAL ────────────────────────────────────────────────────────── -->
+<div class="sv-modal-overlay" *ngIf="rejectModalOpen" (click)="closeModals()">
+  <div class="sv-modal" (click)="$event.stopPropagation()">
+    <div class="sv-modal-header sv-modal-header-reject">
+      <i class="fas fa-circle-xmark"></i>
+      <h3>Refuser la demande</h3>
+    </div>
+    <div class="sv-modal-body" *ngIf="rejectTarget">
+      <p>
+        Vous allez refuser la <strong>{{ getTransactionLabel(rejectTarget) | lowercase }}</strong>
+        du bien <strong>« {{ rejectTarget.propertyTitle }} »</strong>.
+        Le bien sera remis en statut <strong>DISPONIBLE</strong>.
+      </p>
+      <label class="sv-label">Motif du refus <span class="sv-optional">(optionnel)</span></label>
+      <textarea class="sv-textarea" [(ngModel)]="rejectReason"
+                placeholder="Expliquez la raison du refus…" rows="3"></textarea>
+    </div>
+    <div class="sv-modal-footer">
+      <button class="sv-btn sv-btn-ghost" (click)="closeModals()" [disabled]="actionLoading">Annuler</button>
+      <button class="sv-btn sv-btn-reject-lg" (click)="confirmReject()" [disabled]="actionLoading">
+        <i class="fas fa-times" *ngIf="!actionLoading"></i>
+        <i class="fas fa-spinner fa-spin" *ngIf="actionLoading"></i>
+        Refuser
+      </button>
+    </div>
+  </div>
+</div>

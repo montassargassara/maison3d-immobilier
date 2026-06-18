@@ -1,0 +1,870 @@
+<section class="properties-admin">
+
+  <!-- ══════════════════════════════════════════════════════════
+       PAGE HEADER
+       ══════════════════════════════════════════════════════════ -->
+  <header class="page-header">
+    <div class="page-title-block">
+      <div class="page-title-text">
+        <span class="eyebrow">Biens immobiliers</span>
+        <h2>Gestion des propriétés</h2>
+      </div>
+      <div class="header-actions">
+        @if (finalizedCount > 0) {
+          <button class="btn-ghost" type="button"
+                  [class.active]="showFinalized"
+                  (click)="showFinalized = !showFinalized; applyFilters()">
+            <i class="fas fa-gavel"></i>
+            {{ showFinalized ? 'Masquer vendus' : 'Vendus (' + finalizedCount + ')' }}
+          </button>
+        }
+        <button class="btn-ghost" type="button" (click)="filtersOpen = !filtersOpen">
+          <i class="fas fa-filter"></i> Filtres
+          <i class="fas" [class.fa-chevron-down]="!filtersOpen" [class.fa-chevron-up]="filtersOpen"></i>
+        </button>
+        <button class="btn-ghost" type="button" (click)="resetFilters()" title="Réinitialiser">
+          <i class="fas fa-rotate-left"></i>
+        </button>
+        <a class="btn-primary" routerLink="/admin/properties/new">
+          <i class="fas fa-plus"></i> Nouveau bien
+        </a>
+      </div>
+    </div>
+
+    <!-- KPI strip -->
+    <div class="kpi-strip">
+      <div class="kpi-card">
+        <div class="kpi-icon-wrap kpi-total"><i class="fas fa-building"></i></div>
+        <div class="kpi-info">
+          <span class="kpi-num">{{ totalCount }}</span>
+          <span class="kpi-lbl">Total</span>
+        </div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-icon-wrap kpi-green"><i class="fas fa-circle-check"></i></div>
+        <div class="kpi-info">
+          <span class="kpi-num">{{ disponibleCount }}</span>
+          <span class="kpi-lbl">Disponibles</span>
+        </div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-icon-wrap kpi-amber"><i class="fas fa-clock"></i></div>
+        <div class="kpi-info">
+          <span class="kpi-num">{{ enAttenteCount }}</span>
+          <span class="kpi-lbl">En attente</span>
+        </div>
+      </div>
+      @if (pendingValidationCount > 0) {
+        <div class="kpi-card kpi-card--alert">
+          <div class="kpi-icon-wrap kpi-red"><i class="fas fa-triangle-exclamation"></i></div>
+          <div class="kpi-info">
+            <span class="kpi-num">{{ pendingValidationCount }}</span>
+            <span class="kpi-lbl">Validation requise</span>
+          </div>
+        </div>
+      }
+      <div class="kpi-card kpi-card--clickable"
+           (click)="leadsPanelOpen = !leadsPanelOpen; leadsPanelProperty = null">
+        <div class="kpi-icon-wrap kpi-pink"><i class="fas fa-heart"></i></div>
+        <div class="kpi-info">
+          <span class="kpi-num">{{ pendingLeadsCount }}</span>
+          <span class="kpi-lbl">Leads actifs</span>
+        </div>
+      </div>
+      @if (pendingCount > 0) {
+        <div class="kpi-card">
+          <div class="kpi-icon-wrap kpi-purple"><i class="fas fa-file-circle-check"></i></div>
+          <div class="kpi-info">
+            <span class="kpi-num">{{ pendingCount }}</span>
+            <span class="kpi-lbl">À valider</span>
+          </div>
+        </div>
+      }
+    </div>
+  </header>
+
+  <!-- Notifications -->
+  @if (errorMessage) {
+    <div class="alert-toast alert-toast--error" (click)="errorMessage = ''">
+      <i class="fas fa-circle-xmark"></i> {{ errorMessage }}
+      <button class="alert-close" type="button">×</button>
+    </div>
+  }
+  @if (successMessage) {
+    <div class="alert-toast alert-toast--success">
+      <i class="fas fa-circle-check"></i> {{ successMessage }}
+    </div>
+  }
+
+  <!-- ══════════════════════════════════════════════════════════
+       SEARCH & FILTERS
+       ══════════════════════════════════════════════════════════ -->
+  <div class="search-bar-row">
+    <div class="search-input-wrap">
+      <i class="fas fa-magnifying-glass search-icon"></i>
+      <input type="text" class="search-input"
+             placeholder="Rechercher un bien, référence, ville…"
+             [(ngModel)]="searchTerm"
+             (ngModelChange)="applyFilters()" />
+      @if (searchTerm) {
+        <button class="search-clear" type="button" (click)="searchTerm = ''; applyFilters()">
+          <i class="fas fa-xmark"></i>
+        </button>
+      }
+    </div>
+  </div>
+
+  @if (filtersOpen) {
+    <div class="filters-panel">
+      <div class="filters-grid">
+        <div class="filter-group">
+          <label>Type de bien</label>
+          <select [(ngModel)]="typeFilter" (ngModelChange)="applyFilters()">
+            <option value="">Tous les types</option>
+            @for (t of availableTypes; track t) {
+              <option [value]="t">{{ t }}</option>
+            }
+          </select>
+        </div>
+        <div class="filter-group">
+          <label>Ville</label>
+          <select [(ngModel)]="cityFilter" (ngModelChange)="applyFilters()">
+            <option value="">Toutes les villes</option>
+            @for (c of availableCities; track c) {
+              <option [value]="c">{{ c }}</option>
+            }
+          </select>
+        </div>
+        <div class="filter-group">
+          <label>Catégorie</label>
+          <select [(ngModel)]="categoryFilter" (ngModelChange)="applyFilters()">
+            <option value="">Toutes</option>
+            <option value="Vente">Vente</option>
+            <option value="Location">Location</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label>Validation interne</label>
+          <select [(ngModel)]="validationFilter" (ngModelChange)="applyFilters()">
+            <option value="">Tous</option>
+            <option value="APPROVED">Approuvé</option>
+            <option value="PENDING_ADMIN">En attente Admin</option>
+            <option value="PENDING_RESPONSABLE">En attente Responsable</option>
+            <option value="REJECTED">Refusé</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label>Prix min (TND)</label>
+          <input type="number" [(ngModel)]="minPrice" (ngModelChange)="applyFilters()" placeholder="0" />
+        </div>
+        <div class="filter-group">
+          <label>Prix max (TND)</label>
+          <input type="number" [(ngModel)]="maxPrice" (ngModelChange)="applyFilters()" placeholder="∞" />
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- ══════════════════════════════════════════════════════════
+       SECTION TABS
+       ══════════════════════════════════════════════════════════ -->
+  <div class="section-tabs-row">
+    <button class="section-tab" type="button"
+            [class.active]="activeSection === 'section1'"
+            (click)="activeSection = 'section1'">
+      <i class="fas" [class.fa-star]="isSuperAdmin" [class.fa-building]="!isSuperAdmin"></i>
+      {{ section1Title }}
+      <span class="tab-badge">{{ getChipCount('section1', 'TOUS') }}</span>
+    </button>
+    <button class="section-tab" type="button"
+            [class.active]="activeSection === 'section2'"
+            (click)="activeSection = 'section2'">
+      <i class="fas" [class.fa-city]="isSuperAdmin" [class.fa-share-nodes]="!isSuperAdmin"></i>
+      {{ section2Title }}
+      <span class="tab-badge">{{ getChipCount('section2', 'TOUS') }}</span>
+    </button>
+  </div>
+
+  <!-- Status chips -->
+  <div class="status-chips-row">
+    @for (chip of statusChips; track chip.value) {
+      <button class="status-chip" type="button"
+              [class.active]="activeStatusFilter === chip.value"
+              (click)="setStatusFilter(chip.value)">
+        <i class="fas" [ngClass]="'fa-' + chip.icon.replace('fa-', '')"></i>
+        {{ chip.label }}
+        <span class="chip-count">{{ getChipCount(activeSection, chip.value) }}</span>
+      </button>
+    }
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════
+       PROPERTY GRID
+       ══════════════════════════════════════════════════════════ -->
+  @if (loading) {
+    <div class="loading-state">
+      <div class="spinner"></div>
+      <p>Chargement des biens…</p>
+    </div>
+  } @else if (activeProperties.length === 0) {
+    <div class="empty-state">
+      <div class="empty-icon"><i class="fas fa-building-circle-xmark"></i></div>
+      <h3>Aucun bien trouvé</h3>
+      <p>{{ activeStatusFilter !== 'TOUS' ? 'Essayez un autre filtre de statut.' : 'Aucun bien dans cette section.' }}</p>
+      @if (activeStatusFilter !== 'TOUS') {
+        <button class="btn-ghost" (click)="setStatusFilter('TOUS')">Voir tous les biens</button>
+      }
+    </div>
+  } @else {
+    <div class="properties-grid">
+      @for (prop of activeProperties; track prop.id) {
+        <article class="property-card" [class.card--locked]="isPropertyLocked(prop)">
+
+          <!-- Image -->
+          <div class="card-image-wrap">
+            @if (getImageUrl(prop)) {
+              <img [src]="getImageUrl(prop)" [alt]="prop.titre"
+                   class="card-image" (error)="onImageError(prop)" />
+            } @else {
+              <div class="card-image-placeholder">
+                <i class="fas fa-image"></i>
+              </div>
+            }
+
+            <!-- Status badge -->
+            <span class="card-status-badge" [ngClass]="getStatusClass(prop.statut, prop)">
+              @if (prop.statut === 'EN_ATTENTE' && isCrossValidationPending(prop)) {
+                <i class="fas fa-shield-halved"></i>
+              } @else if (prop.statut === 'DISPONIBLE') {
+                <i class="fas fa-circle-check"></i>
+              } @else if (prop.statut === 'VENDU') {
+                <i class="fas fa-gavel"></i>
+              } @else if (prop.statut === 'LOUE') {
+                <i class="fas fa-key"></i>
+              } @else {
+                <i class="fas fa-clock"></i>
+              }
+              {{ isCrossValidationPending(prop) ? 'Validation requise' : getStatusLabel(prop.statut) }}
+            </span>
+
+            <!-- Category pill -->
+            <span class="card-category-pill"
+                  [class.pill-vente]="getPropertyCategory(prop) === 'VENTE'"
+                  [class.pill-location]="getPropertyCategory(prop) === 'LOCATION'">
+              {{ getCategoryLabel(prop) }}
+            </span>
+
+            <!-- Validation badge (internal workflow) -->
+            @if (prop.validationStatus && prop.validationStatus !== 'APPROVED') {
+              <span class="card-validation-badge" [ngClass]="getValidationClass(prop.validationStatus)">
+                <i class="fas fa-file-circle-check"></i>
+                {{ getValidationLabel(prop.validationStatus) }}
+              </span>
+            }
+
+            <!-- Lead count -->
+            @if (getLeadCount(prop) > 0) {
+              <button class="card-leads-badge" type="button"
+                      (click)="openLeadsPanel(prop, $event)"
+                      [title]="getLeadCount(prop) + ' leads'">
+                <i class="fas fa-heart"></i>
+                {{ getLeadCount(prop) }}
+              </button>
+            }
+          </div>
+
+          <!-- Card body -->
+          <div class="card-body">
+            <div class="card-ref">{{ getReference(prop) }}</div>
+            <h3 class="card-title">{{ prop.titre }}</h3>
+
+            <div class="card-meta-row">
+              <span class="card-meta"><i class="fas fa-location-dot"></i> {{ getLocation(prop) }}</span>
+              @if (prop.surface) {
+                <span class="card-meta"><i class="fas fa-ruler-combined"></i> {{ prop.surface }} m²</span>
+              }
+            </div>
+
+            <div class="card-features-row">
+              @if (prop.nbChambres) {
+                <span class="feature-chip"><i class="fas fa-bed"></i> {{ prop.nbChambres }}</span>
+              }
+              @if (prop.type) {
+                <span class="feature-chip"><i class="fas fa-home"></i> {{ prop.type }}</span>
+              }
+              @if (prop.hasModel3d) {
+                <span class="feature-chip feature-chip--3d"><i class="fas fa-cube"></i> 3D</span>
+              }
+            </div>
+
+            <div class="card-price-row">
+              <span class="card-price">{{ formatPrice(prop) }}</span>
+              @if (prop.commissionLocked && prop.ownerType === 'SUPER_ADMIN_OWNED' && !isSuperAdmin) {
+                <span class="commission-badge">
+                  <i class="fas fa-percent"></i> Commission partagée
+                </span>
+              }
+            </div>
+
+            <!-- Ownership -->
+            @if (getOwnershipBadge(prop)) {
+              <div class="card-ownership">
+                <span class="ownership-badge" [ngClass]="getOwnershipClass(prop)">
+                  <i class="fas fa-building"></i> {{ getOwnershipBadge(prop) }}
+                </span>
+              </div>
+            }
+
+            <!-- Cross-ownership validation info -->
+            @if (isCrossValidationPending(prop)) {
+              <div class="validation-alert">
+                <i class="fas fa-shield-halved"></i>
+                <span>En attente de validation par le propriétaire du bien</span>
+              </div>
+            }
+
+            <!-- Old pending sale approval -->
+            @if (hasPendingSale(prop)) {
+              <div class="validation-alert validation-alert--sale">
+                <i class="fas fa-clock-rotate-left"></i>
+                <span>{{ getPendingSaleLabel(prop) }}</span>
+              </div>
+            }
+
+            <!-- Locked indicator -->
+            @if (isPropertyLocked(prop)) {
+              <div class="locked-ribbon">
+                <i class="fas fa-lock"></i>
+                <span>{{ prop.statut === 'VENDU' ? 'Bien vendu — verrouillé' : prop.isStatusLocked ? prop.statusLockReason : 'Verrouillé' }}</span>
+              </div>
+            }
+
+            <!-- Rental end date -->
+            @if (prop.statut === 'LOUE' && prop.rentalEndDate) {
+              <div class="rental-end-chip">
+                <i class="fas fa-calendar-check"></i>
+                Fin de bail : {{ formatDate(prop.rentalEndDate?.toString()) }}
+              </div>
+            }
+
+            <!-- Buyer info -->
+            @if (prop.buyerName) {
+              <div class="buyer-chip">
+                <i class="fas fa-user-check"></i> {{ prop.buyerName }}
+              </div>
+            }
+          </div>
+
+          <!-- Card actions -->
+          <div class="card-actions">
+            <!-- View -->
+            <a class="action-btn action-btn--ghost"
+               [routerLink]="['/admin/properties', prop.id]"
+               title="Voir le détail">
+              <i class="fas fa-eye"></i>
+            </a>
+
+            <!-- Edit -->
+            @if (canEditProperty(prop)) {
+              <a class="action-btn action-btn--ghost"
+                 [routerLink]="['/admin/properties/edit', prop.id]"
+                 title="Modifier">
+                <i class="fas fa-pen-to-square"></i>
+              </a>
+            }
+
+            <!-- Share (Super Admin only) -->
+            @if (canShare(prop)) {
+              <button class="action-btn action-btn--ghost" type="button"
+                      (click)="openShareModal(prop)" title="Partager avec une agence">
+                <i class="fas fa-share-nodes"></i>
+              </button>
+            }
+
+            <!-- Sale / rental — visible to all internal staff. COMMERCIAL /
+                 RESPONSABLE_COMMERCIAL initiate; backend forces validation. -->
+            @if (canInitiateSale && prop.statut !== 'VENDU' && prop.statut !== 'LOUE' && prop.statut !== 'EN_ATTENTE' && !isPropertyLocked(prop)) {
+              <button class="action-btn action-btn--primary" type="button"
+                      (click)="openDirectSaleModal(prop, getPropertyCategory(prop) === 'LOCATION' ? 'LOUE' : 'VENDU')"
+                      title="{{ statusChangeNeedsApproval(prop) ? (getPropertyCategory(prop) === 'LOCATION' ? 'Demander la validation de la location' : 'Demander la validation de la vente') : (getPropertyCategory(prop) === 'LOCATION' ? 'Finaliser la location' : 'Finaliser la vente') }}">
+                <i class="fas {{ getPropertyCategory(prop) === 'LOCATION' ? 'fa-key' : 'fa-gavel' }}"></i>
+              </button>
+            }
+
+            <!-- Status change -->
+            @if (canChangeStatus(prop) && !isPropertyLocked(prop)) {
+              <div class="action-dropdown-wrap">
+                <select class="action-select"
+                        [value]="prop.statut"
+                        (change)="updateStatus(prop, $any($event.target).value)"
+                        title="{{ statusChangeNeedsApproval(prop) ? approvalChainLabel(prop) : 'Changer le statut' }}">
+                  @for (s of getStatusesForProperty(prop); track s.value) {
+                    <option [value]="s.value"
+                            [disabled]="isStatusDisabledForProperty(prop, s.value) || s.value === 'VENDU' || s.value === 'LOUE'">
+                      {{ s.label }}
+                    </option>
+                  }
+                </select>
+              </div>
+            }
+
+            <!-- Approve pending sale (old workflow) -->
+            @if (canApproveSaleFor(prop)) {
+              <button class="action-btn action-btn--success" type="button"
+                      (click)="approveSale(prop)" title="Approuver">
+                <i class="fas fa-check"></i>
+              </button>
+              <button class="action-btn action-btn--danger" type="button"
+                      (click)="rejectSale(prop)" title="Refuser">
+                <i class="fas fa-xmark"></i>
+              </button>
+            }
+
+            <!-- Leads panel -->
+            @if (getLeadCount(prop) > 0) {
+              <button class="action-btn action-btn--ghost" type="button"
+                      (click)="openLeadsPanel(prop, $event)"
+                      title="{{ getLeadCount(prop) }} leads CRM">
+                <i class="fas fa-heart"></i>
+                <span class="action-badge">{{ getLeadCount(prop) }}</span>
+              </button>
+            }
+
+            <!-- Delete -->
+            @if (canEditProperty(prop) && !isPropertyLocked(prop)) {
+              <button class="action-btn action-btn--danger" type="button"
+                      (click)="deleteProperty(prop)" title="Supprimer">
+                <i class="fas fa-trash"></i>
+              </button>
+            }
+          </div>
+
+        </article>
+      }
+    </div>
+  }
+
+
+  <!-- ══════════════════════════════════════════════════════════
+       LEADS PANEL (slide-over)
+       ══════════════════════════════════════════════════════════ -->
+  @if (leadsPanelOpen) {
+    <div class="panel-backdrop" (click)="closeLeadsPanel()"></div>
+    <aside class="leads-panel">
+      <div class="leads-panel-header">
+        <div>
+          <h3>Leads CRM</h3>
+          @if (leadsPanelProperty) {
+            <p class="leads-panel-sub">{{ leadsPanelProperty.titre }}</p>
+          } @else {
+            <p class="leads-panel-sub">Tous les leads actifs</p>
+          }
+        </div>
+        <button class="panel-close" type="button" (click)="closeLeadsPanel()">
+          <i class="fas fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="leads-panel-body">
+        @if (leadsLoading) {
+          <div class="panel-loading"><div class="spinner"></div></div>
+        } @else if (currentPropertyLeads.length === 0 && leadsPanelProperty) {
+          <div class="panel-empty">
+            <i class="fas fa-heart-crack"></i>
+            <p>Aucun lead pour ce bien.</p>
+          </div>
+        } @else {
+          @for (lead of (leadsPanelProperty ? currentPropertyLeads : leads); track lead.id) {
+            <div class="lead-card" [class.lead-card--locked]="lead.locked">
+              <div class="lead-card-header">
+                <div class="lead-avatar">{{ lead.fullName.charAt(0).toUpperCase() }}</div>
+                <div class="lead-info">
+                  <span class="lead-name">{{ lead.fullName }}</span>
+                  <span class="lead-date">{{ formatLeadDate(lead.createdAt) }}</span>
+                </div>
+                <span class="lead-status-dot" [style.background]="getLeadStatusColor(lead.status)"
+                      [title]="getLeadStatusLabel(lead.status)"></span>
+              </div>
+
+              <div class="lead-contacts">
+                <a [href]="'tel:' + lead.telephone" class="lead-contact-btn" title="Appeler">
+                  <i class="fas fa-phone"></i>
+                </a>
+                <a [href]="'https://wa.me/' + formatWhatsApp(lead.telephone)" target="_blank"
+                   class="lead-contact-btn lead-contact-btn--wa" title="WhatsApp">
+                  <i class="fab fa-whatsapp"></i>
+                </a>
+                <a [href]="'mailto:' + lead.email" class="lead-contact-btn" title="Email">
+                  <i class="fas fa-envelope"></i>
+                </a>
+              </div>
+
+              @if (lead.message) {
+                <p class="lead-message">{{ lead.message }}</p>
+              }
+
+              @if (lead.locked) {
+                <div class="lead-locked-ribbon">
+                  <i class="fas fa-lock"></i> {{ getLeadStatusLabel(lead.status) }}
+                  @if (lead.rejectionMessage) { — {{ lead.rejectionMessage }} }
+                </div>
+              } @else {
+                <select class="lead-status-select"
+                        [value]="lead.status"
+                        (change)="updateLeadStatus(lead, $any($event.target).value)">
+                  @for (s of getAvailableLeadStatuses(lead); track s.value) {
+                    <option [value]="s.value">{{ s.label }}</option>
+                  }
+                </select>
+              }
+
+              @if (lead.status === 'CONVERTI_LOCATION' && lead.rentalStartDate) {
+                <div class="lead-rental-info">
+                  <i class="fas fa-file-contract"></i>
+                  Du {{ formatDate(lead.rentalStartDate) }} au {{ formatDate(lead.rentalEndDate) }}
+                  @if (lead.rentalAmount) { — {{ lead.rentalAmount }} TND/mois }
+                </div>
+              }
+            </div>
+          }
+        }
+      </div>
+    </aside>
+  }
+
+
+  <!-- ══════════════════════════════════════════════════════════
+       MODAL — LEAD REFUSE
+       ══════════════════════════════════════════════════════════ -->
+  @if (refuseModalOpen) {
+    <div class="modal-backdrop" (click)="cancelRefuse()">
+      <div class="modal" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h3><i class="fas fa-user-slash"></i> Refuser le lead</h3>
+          <button class="modal-close" (click)="cancelRefuse()"><i class="fas fa-xmark"></i></button>
+        </div>
+        <div class="modal-body">
+          <p class="modal-desc">Motif de refus (optionnel) :</p>
+          <textarea class="modal-textarea" rows="3" [(ngModel)]="refuseMessage"
+                    placeholder="Expliquez la raison du refus…"></textarea>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-ghost" (click)="cancelRefuse()">Annuler</button>
+          <button class="btn-danger" (click)="confirmRefuse()">Confirmer le refus</button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- ══════════════════════════════════════════════════════════
+       MODAL — LEAD CONVERTI_LOCATION
+       ══════════════════════════════════════════════════════════ -->
+  @if (rentalModalOpen) {
+    <div class="modal-backdrop" (click)="cancelRentalModal()">
+      <div class="modal" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h3><i class="fas fa-file-contract"></i> Contrat de location</h3>
+          <button class="modal-close" (click)="cancelRentalModal()"><i class="fas fa-xmark"></i></button>
+        </div>
+        <div class="modal-body">
+          <div class="modal-form-grid">
+            <div class="modal-field">
+              <label>Date de début *</label>
+              <input type="date" [(ngModel)]="rentalStartDate" />
+            </div>
+            <div class="modal-field">
+              <label>Durée (mois) *</label>
+              <input type="number" [(ngModel)]="rentalDurationMonths" min="1" placeholder="ex. 12" />
+            </div>
+            <div class="modal-field">
+              <label>Loyer mensuel (TND)</label>
+              <input type="number" [(ngModel)]="rentalAmount" min="0" placeholder="ex. 800" />
+            </div>
+            <div class="modal-field">
+              <label>Notes</label>
+              <input type="text" [(ngModel)]="rentalNotes" placeholder="Caution, conditions…" />
+            </div>
+          </div>
+          @if (rentalEndDatePreview) {
+            <div class="modal-info-box">
+              <i class="fas fa-calendar-days"></i>
+              Fin de bail estimée : <strong>{{ rentalEndDatePreview }}</strong>
+            </div>
+          }
+        </div>
+        <div class="modal-footer">
+          <button class="btn-ghost" (click)="cancelRentalModal()">Annuler</button>
+          <button class="btn-primary" [disabled]="!rentalModalValid" (click)="confirmConvertLocation()">
+            Confirmer la location
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- ══════════════════════════════════════════════════════════
+       MODAL — LEAD CONVERTI_VENTE confirm
+       ══════════════════════════════════════════════════════════ -->
+  @if (convertVenteConfirmOpen) {
+    <div class="modal-backdrop" (click)="cancelConvertVente()">
+      <div class="modal modal--sm" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h3><i class="fas fa-gavel"></i> Confirmer la vente</h3>
+          <button class="modal-close" (click)="cancelConvertVente()"><i class="fas fa-xmark"></i></button>
+        </div>
+        <div class="modal-body">
+          <div class="modal-warn-box">
+            <i class="fas fa-triangle-exclamation"></i>
+            Cette action est <strong>irréversible</strong>. Le bien sera marqué comme vendu et
+            tous les autres leads seront automatiquement refusés.
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-ghost" (click)="cancelConvertVente()">Annuler</button>
+          <button class="btn-danger" (click)="confirmConvertVente()">Confirmer la vente</button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- ══════════════════════════════════════════════════════════
+       MODAL — DIRECT SALE / RENTAL
+       ══════════════════════════════════════════════════════════ -->
+  @if (directSaleOpen && directSaleItem) {
+    <div class="modal-backdrop" (click)="closeDirectSaleModal()">
+      <div class="modal modal--lg" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h3>
+            <i class="fas" [class.fa-gavel]="directSaleTargetStatus === 'VENDU'" [class.fa-key]="directSaleTargetStatus === 'LOUE'"></i>
+            {{ directSaleTargetStatus === 'VENDU' ? 'Finaliser la vente' : 'Finaliser la location' }}
+          </h3>
+          <button class="modal-close" (click)="closeDirectSaleModal()"><i class="fas fa-xmark"></i></button>
+        </div>
+
+        <div class="modal-body">
+          <!-- Property summary -->
+          <div class="modal-property-summary">
+            <span class="mps-ref">{{ getReference(directSaleItem) }}</span>
+            <span class="mps-title">{{ directSaleItem.titre }}</span>
+            <span class="mps-price">{{ formatPrice(directSaleItem) }}</span>
+          </div>
+
+          @if (statusChangeNeedsApproval(directSaleItem)) {
+            <div class="modal-info-box modal-info-box--amber">
+              <i class="fas fa-shield-halved"></i>
+              <span>{{ approvalChainLabel(directSaleItem) }} Le bien passera en statut <strong>En attente</strong> jusqu'à la validation.</span>
+            </div>
+          }
+
+          <!-- Client search -->
+          <div class="modal-section-title">Client</div>
+          <div class="client-search-row">
+            <div class="client-search-input-wrap">
+              <i class="fas fa-magnifying-glass"></i>
+              <input type="text" [(ngModel)]="directSaleSearchTerm"
+                     (ngModelChange)="searchDirectSaleClients()"
+                     placeholder="Rechercher un client existant…"
+                     [disabled]="!!directSaleSelectedClient" />
+              @if (directSaleSelectedClient) {
+                <button class="search-clear" (click)="clearDirectSaleClient()">
+                  <i class="fas fa-xmark"></i>
+                </button>
+              }
+            </div>
+            <button class="btn-ghost btn-sm" type="button"
+                    (click)="directSaleNewMode = !directSaleNewMode; directSaleSelectedClient = null; directSaleResults = []">
+              <i class="fas fa-plus"></i> Nouveau client
+            </button>
+          </div>
+
+          @if (directSaleSearching) {
+            <div class="search-loading"><div class="spinner spinner--sm"></div> Recherche…</div>
+          }
+
+          @if (directSaleResults.length > 0) {
+            <div class="client-results">
+              @for (client of directSaleResults; track client.id) {
+                <button class="client-result-row" type="button" (click)="selectDirectSaleClient(client)">
+                  <div class="client-avatar-sm">{{ client.prenom?.charAt(0) ?? 'C' }}</div>
+                  <div class="client-result-info">
+                    <span class="cr-name">{{ client.prenom }} {{ client.nom }}</span>
+                    <span class="cr-email">{{ client.email }}</span>
+                  </div>
+                </button>
+              }
+            </div>
+          }
+
+          @if (directSaleSelectedClient) {
+            <div class="selected-client-chip">
+              <i class="fas fa-user-check"></i>
+              <span>{{ directSaleSelectedClient.prenom }} {{ directSaleSelectedClient.nom }} — {{ directSaleSelectedClient.email }}</span>
+            </div>
+          }
+
+          @if (directSaleNewMode) {
+            <div class="modal-form-grid">
+              <div class="modal-field">
+                <label>Nom *</label>
+                <input type="text" [(ngModel)]="directSaleNom" placeholder="Nom du client" />
+              </div>
+              <div class="modal-field">
+                <label>Prénom</label>
+                <input type="text" [(ngModel)]="directSalePrenom" placeholder="Prénom" />
+              </div>
+              <div class="modal-field">
+                <label>Email *</label>
+                <input type="email" [(ngModel)]="directSaleEmail" placeholder="email@exemple.com" />
+              </div>
+              <div class="modal-field">
+                <label>Téléphone</label>
+                <input type="tel" [(ngModel)]="directSaleTelephone" placeholder="+216…" />
+              </div>
+            </div>
+          }
+
+          <!-- Rental fields -->
+          @if (directSaleTargetStatus === 'LOUE') {
+            <div class="modal-section-title">Contrat de location</div>
+            <div class="modal-form-grid">
+              <div class="modal-field">
+                <label>Date de début *</label>
+                <input type="date" [(ngModel)]="directSaleRentalStart" />
+              </div>
+              <div class="modal-field">
+                <label>Durée (mois) *</label>
+                <input type="number" [(ngModel)]="directSaleRentalMonths" min="1" placeholder="ex. 12" />
+              </div>
+              <div class="modal-field">
+                <label>Loyer mensuel (TND)</label>
+                <input type="number" [(ngModel)]="directSaleRentalAmount" min="0" />
+              </div>
+              <div class="modal-field">
+                <label>Notes</label>
+                <input type="text" [(ngModel)]="directSaleRentalNotes" placeholder="Caution, conditions…" />
+              </div>
+            </div>
+            @if (directSaleRentalEndPreview) {
+              <div class="modal-info-box">
+                <i class="fas fa-calendar-days"></i>
+                Fin de bail : <strong>{{ directSaleRentalEndPreview }}</strong>
+              </div>
+            }
+          }
+
+          @if (directSaleError) {
+            <div class="modal-error">
+              <i class="fas fa-circle-xmark"></i> {{ directSaleError }}
+            </div>
+          }
+        </div>
+
+        <div class="modal-footer">
+          <button class="btn-ghost" (click)="closeDirectSaleModal()" [disabled]="directSaleLoading">Annuler</button>
+          <button class="btn-primary" (click)="confirmDirectSale()"
+                  [disabled]="!directSaleCanConfirm || directSaleLoading">
+            @if (directSaleLoading) { <div class="spinner spinner--sm spinner--white"></div> }
+            {{ directSaleTargetStatus === 'VENDU' ? 'Confirmer la vente' : 'Confirmer la location' }}
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- ══════════════════════════════════════════════════════════
+       MODAL — SHARE
+       ══════════════════════════════════════════════════════════ -->
+  @if (shareModalOpen && shareTargetProperty) {
+    <div class="modal-backdrop" (click)="closeShareModal()">
+      <div class="modal modal--lg" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h3><i class="fas fa-share-nodes"></i> Partager avec une agence</h3>
+          <button class="modal-close" (click)="closeShareModal()"><i class="fas fa-xmark"></i></button>
+        </div>
+
+        <div class="modal-body">
+          <div class="modal-property-summary">
+            <span class="mps-title">{{ shareTargetProperty.titre }}</span>
+          </div>
+
+          @if (shareSuccessMessage) {
+            <div class="modal-success-box"><i class="fas fa-circle-check"></i> {{ shareSuccessMessage }}</div>
+          }
+          @if (shareError) {
+            <div class="modal-error"><i class="fas fa-circle-xmark"></i> {{ shareError }}</div>
+          }
+
+          <!-- Commission -->
+          <div class="modal-section-title">Commission</div>
+          <div class="commission-row">
+            <div class="modal-field">
+              <label>Type</label>
+              <select [(ngModel)]="commissionType">
+                <option value="PERCENTAGE">Pourcentage (%)</option>
+                <option value="FIXED">Montant fixe (TND)</option>
+              </select>
+            </div>
+            <div class="modal-field">
+              <label>Valeur</label>
+              <input type="number" [(ngModel)]="commissionValue" min="0" step="0.5" />
+            </div>
+            <div class="commission-preview-chip">
+              <i class="fas fa-percent"></i> {{ commissionPreview }}
+            </div>
+          </div>
+
+          <div class="modal-field">
+            <label>Message (optionnel)</label>
+            <textarea class="modal-textarea" rows="2" [(ngModel)]="shareMessage"
+                      placeholder="Message pour l'agence…"></textarea>
+          </div>
+
+          <!-- Agency list -->
+          <div class="modal-section-title">Agences</div>
+          @if (sharingLoading) {
+            <div class="panel-loading"><div class="spinner"></div></div>
+          } @else if (availableAdmins.length === 0) {
+            <p class="modal-empty-text">Aucune agence disponible.</p>
+          } @else {
+            <div class="agencies-list">
+              @for (admin of availableAdmins; track admin.id) {
+                <div class="agency-row"
+                     [class.agency-row--locked]="isAdminLocked(admin)"
+                     [class.agency-row--selected]="isAdminSelected(admin.id)"
+                     (click)="toggleAdmin(admin.id)">
+                  <div class="agency-check">
+                    @if (isAdminSelected(admin.id)) {
+                      <i class="fas fa-square-check"></i>
+                    } @else if (isAdminLocked(admin)) {
+                      <i class="fas fa-lock"></i>
+                    } @else {
+                      <i class="far fa-square"></i>
+                    }
+                  </div>
+                  <div class="agency-info">
+                    <span class="agency-name">{{ admin.fullName }}</span>
+                    <span class="agency-email">{{ admin.email }}</span>
+                  </div>
+                  @if (getAdminStatusLabel(admin)) {
+                    <span class="agency-status-chip" [ngClass]="getAdminStatusClass(admin)">
+                      {{ getAdminStatusLabel(admin) }}
+                    </span>
+                  }
+                </div>
+              }
+            </div>
+          }
+        </div>
+
+        <div class="modal-footer">
+          <button class="btn-ghost" (click)="closeShareModal()">Annuler</button>
+          <button class="btn-primary" (click)="sendShareRequests()" [disabled]="sharingLoading">
+            @if (sharingLoading) { <div class="spinner spinner--sm spinner--white"></div> }
+            Envoyer les demandes
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+</section>

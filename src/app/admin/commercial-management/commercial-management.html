@@ -1,0 +1,118 @@
+<div class="page-wrapper">
+  <div class="page-header">
+    <div class="page-header-left">
+      <h2><i class="fas fa-users-gear"></i> Gestion commerciale</h2>
+      <p class="page-subtitle">
+        Performance des commerciaux — ventes, locations, chiffre d'affaires et commissions
+      </p>
+    </div>
+    <div class="page-header-right">
+      <a class="btn btn-outline" routerLink="/admin/commercial-commissions">
+        <i class="fas fa-coins"></i> Commissions commerciaux
+      </a>
+      <button class="btn btn-outline" (click)="load()"><i class="fas fa-sync-alt"></i> Actualiser</button>
+    </div>
+  </div>
+
+  <div class="alert alert-danger" *ngIf="errorMessage">
+    <i class="fas fa-exclamation-circle"></i> {{ errorMessage }}
+  </div>
+
+  <!-- KPIs -->
+  <div class="kpi-grid" *ngIf="!loading">
+    <div class="kpi-card">
+      <div class="kpi-icon kpi-blue"><i class="fas fa-user-tie"></i></div>
+      <div class="kpi-value">{{ totalCommercials }}</div>
+      <p class="kpi-label">Commerciaux actifs en transaction</p>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon kpi-purple"><i class="fas fa-chart-line"></i></div>
+      <div class="kpi-value" style="font-size:1.4rem;">{{ fmt(totalRevenue) }}</div>
+      <p class="kpi-label">CA généré</p>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon kpi-green"><i class="fas fa-hand-holding-dollar"></i></div>
+      <div class="kpi-value" style="font-size:1.4rem;">{{ fmt(totalEarned) }}</div>
+      <p class="kpi-label">Commissions générées</p>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon kpi-orange"><i class="fas fa-clock"></i></div>
+      <div class="kpi-value" style="font-size:1.4rem;">{{ fmt(totalPending) }}</div>
+      <p class="kpi-label">Commissions en attente</p>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="filter-bar">
+    <input type="text" placeholder="Rechercher commercial ou agence…"
+           [(ngModel)]="searchTerm" (input)="applyFilters()"
+           class="form-control" style="max-width:260px">
+    <select [(ngModel)]="roleFilter" (change)="applyFilters()">
+      <option value="">Tous les rôles</option>
+      <option value="COMMERCIAL">Commercial</option>
+      <option value="RESPONSABLE_COMMERCIAL">Responsable</option>
+    </select>
+    <select [(ngModel)]="statusFilter" (change)="applyFilters()">
+      <option value="">Tous les statuts</option>
+      <option value="active">Actif</option>
+      <option value="inactive">Inactif</option>
+    </select>
+  </div>
+
+  <div class="loading-state" *ngIf="loading">
+    <i class="fas fa-spinner fa-spin"></i><span>Chargement…</span>
+  </div>
+  <div class="empty-state" *ngIf="!loading && filtered.length === 0">
+    <i class="fas fa-users-gear fa-3x"></i>
+    <h3>Aucune performance commerciale</h3>
+    <p>Les performances apparaissent dès qu'une vente/location d'un commercial est validée.</p>
+  </div>
+
+  <div class="table-card" *ngIf="!loading && filtered.length > 0">
+    <div class="table-header">
+      <h3><i class="fas fa-ranking-star"></i> {{ filtered.length }} commercial(aux)</h3>
+    </div>
+    <div class="offers-wrapper">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Commercial</th>
+            <th>Rôle</th>
+            <th>Agence</th>
+            <th>Ventes</th>
+            <th>Locations</th>
+            <th>CA généré</th>
+            <th>Taux</th>
+            <th>Commissions</th>
+            <th>Payées</th>
+            <th>En attente</th>
+            <th>Ce mois</th>
+            <th>Statut</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let r of filtered; trackBy: trackById">
+            <td style="font-weight:600;font-size:0.875rem;">
+              {{ r.name }}
+              <div style="font-size:0.75rem;color:var(--text-muted);">{{ r.email }}</div>
+            </td>
+            <td style="font-size:0.8125rem;">{{ roleLabel(r.role) }}</td>
+            <td style="font-size:0.8125rem;color:var(--text-secondary);">{{ r.agencyName }}</td>
+            <td style="font-size:0.875rem;text-align:center;">{{ r.salesCount }}</td>
+            <td style="font-size:0.875rem;text-align:center;">{{ r.rentalsCount }}</td>
+            <td style="font-size:0.875rem;">{{ fmt(r.revenueGenerated) }}</td>
+            <td style="font-size:0.875rem;">{{ r.commissionRate }}%</td>
+            <td style="font-weight:700;color:var(--primary);">{{ fmt(r.commissionsEarned) }}</td>
+            <td style="font-size:0.8125rem;color:var(--success, #16a34a);">{{ fmt(r.commissionsPaid) }}</td>
+            <td style="font-size:0.8125rem;color:var(--warning, #d97706);">{{ fmt(r.commissionsPending) }}</td>
+            <td style="font-size:0.8125rem;">{{ fmt(r.revenueThisMonth) }}</td>
+            <td>
+              <span class="paid-badge" *ngIf="r.active"><i class="fas fa-check"></i> Actif</span>
+              <span class="unpaid-badge" *ngIf="!r.active"><i class="fas fa-ban"></i> Inactif</span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>

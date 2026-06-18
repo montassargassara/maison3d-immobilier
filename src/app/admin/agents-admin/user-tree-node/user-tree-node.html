@@ -1,0 +1,76 @@
+<!-- user-tree-node.component.html -->
+<div class="tree-node">
+  <!-- Node Content -->
+  <div class="tree-node-content" (click)="onToggleNode()">
+    <!-- Toggle Icon -->
+    <div class="tree-toggle">
+      <i *ngIf="hasChildren" 
+         [class]="isExpanded ? 'fas fa-chevron-down' : 'fas fa-chevron-right'"
+         class="toggle-icon"></i>
+      <i *ngIf="!hasChildren" class="fas fa-circle leaf-icon"></i>
+    </div>
+
+    <!-- User Avatar — photo si disponible, sinon initiales -->
+    <div class="user-avatar" [style.background-color]="avatarSafeUrl ? 'transparent' : userService.getRoleColor(node.user.role)">
+      <img *ngIf="avatarSafeUrl" [src]="avatarSafeUrl" alt="" class="user-avatar-img" />
+      <span *ngIf="!avatarSafeUrl">{{ getInitials(node.user.prenom, node.user.nom) }}</span>
+    </div>
+
+    <!-- User Info -->
+    <div class="user-info">
+      <div class="user-name">
+        {{ node.user.prenom }} {{ node.user.nom }}
+        <span *ngIf="node.user.childrenCount" class="agent-count-badge">
+          <i class="fas fa-users"></i>
+          {{ node.user.childrenCount }}
+        </span>
+      </div>
+      <div class="user-email">
+        <i class="fas fa-envelope"></i>
+        {{ node.user.email }}
+      </div>
+      <div class="user-phone" *ngIf="node.user.telephone">
+        <i class="fas fa-phone"></i>
+        {{ node.user.telephone }}
+      </div>
+    </div>
+
+    <!-- Role Badge -->
+    <div class="role-badge" [style.background-color]="userService.getRoleColor(node.user.role)">
+      <i [class]="'fas ' + userService.getRoleIcon(node.user.role)" class="me-1"></i>
+      {{ userService.getRoleText(node.user.role) }}
+    </div>
+
+    <!-- Status -->
+    <div class="status-indicator" [class.active]="node.user.isActive" [class.inactive]="!node.user.isActive">
+      <i class="fas fa-circle"></i>
+    </div>
+
+    <!-- Actions -->
+    <div class="user-actions" (click)="$event.stopPropagation()">
+      <button class="action-btn view-btn" (click)="onView()" title="Voir détails">
+        <i class="fas fa-eye"></i>
+      </button>
+      <button class="action-btn edit-btn" (click)="onEdit()" title="Modifier">
+        <i class="fas fa-edit"></i>
+      </button>
+    </div>
+  </div>
+
+  <!-- Children Nodes -->
+  <div class="tree-children" *ngIf="isExpanded && hasChildren">
+    <div class="children-container">
+      <div class="tree-line"></div>
+      <div class="children-list">
+        <app-user-tree-node 
+          *ngFor="let child of node.children"
+          [node]="child"
+          [expandedNodes]="expandedNodes"
+          (toggleNode)="onChildToggle($event)"
+          (viewUser)="onChildView($event)"
+          (editUser)="onChildEdit($event)">
+        </app-user-tree-node>
+      </div>
+    </div>
+  </div>
+</div>

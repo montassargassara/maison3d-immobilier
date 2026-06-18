@@ -1,0 +1,394 @@
+<!-- agency-applications.component.html -->
+<div class="page-wrapper" style="padding: 2rem; max-width: 1440px; margin: 0 auto;">
+  
+  <!-- Header -->
+  <div class="page-header" style="margin-bottom: 2rem;">
+    <h2 style="font-size: 1.875rem; font-weight: 700; color: #111827; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.75rem;">
+      <i class="fas fa-building-user" style="color: #6366f1;"></i> 
+      Gestion des candidatures
+    </h2>
+    <p style="color: #6b7280;">Examinez et gérez les demandes d'inscription des agences immobilières</p>
+  </div>
+
+  <!-- Alerts -->
+  @if (successMessage) {
+    <div class="alert-modern alert-success" (click)="clearMessages()">
+      <i class="fas fa-check-circle"></i>
+      <span>{{ successMessage }}</span>
+    </div>
+  }
+  @if (errorMessage) {
+    <div class="alert-modern alert-danger" (click)="clearMessages()">
+      <i class="fas fa-exclamation-circle"></i>
+      <span>{{ errorMessage }}</span>
+    </div>
+  }
+
+  <!-- Statistics Cards -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+        <div>
+          <div class="stat-value">{{ stats.total }}</div>
+          <div class="stat-label">Total candidatures</div>
+        </div>
+        <div class="stat-icon icon-total">
+          <i class="fas fa-building"></i>
+        </div>
+      </div>
+    </div>
+    
+    <div class="stat-card">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+        <div>
+          <div class="stat-value">{{ stats.pending }}</div>
+          <div class="stat-label">En attente</div>
+        </div>
+        <div class="stat-icon icon-pending">
+          <i class="fas fa-clock"></i>
+        </div>
+      </div>
+    </div>
+    
+    <div class="stat-card">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+        <div>
+          <div class="stat-value">{{ stats.approved }}</div>
+          <div class="stat-label">Acceptées</div>
+        </div>
+        <div class="stat-icon icon-approved">
+          <i class="fas fa-check-circle"></i>
+        </div>
+      </div>
+    </div>
+    
+    <div class="stat-card">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+        <div>
+          <div class="stat-value">{{ stats.rejected }}</div>
+          <div class="stat-label">Refusées</div>
+        </div>
+        <div class="stat-icon icon-rejected">
+          <i class="fas fa-times-circle"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Search & Filter Bar -->
+  <div class="search-filter-bar">
+    <div style="display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; justify-content: space-between;">
+      <div style="flex: 1; min-width: 250px;">
+        <div class="search-input-wrapper">
+          <i class="fas fa-search"></i>
+          <input 
+            type="text" 
+            placeholder="Rechercher par nom d'agence, responsable ou email..."
+            [(ngModel)]="searchQuery"
+            (input)="onSearchChange(searchQuery)"
+          />
+        </div>
+      </div>
+      
+      <div class="filter-chips">
+        <button 
+          class="filter-chip" 
+          [class.active]="statusFilter === 'all'"
+          (click)="onStatusChange('all')">
+          <i class="fas fa-list"></i> Tous
+        </button>
+        <button 
+          class="filter-chip" 
+          [class.active]="statusFilter === 'pending'"
+          (click)="onStatusChange('pending')">
+          <i class="fas fa-clock"></i> En attente
+        </button>
+        <button 
+          class="filter-chip" 
+          [class.active]="statusFilter === 'approved'"
+          (click)="onStatusChange('approved')">
+          <i class="fas fa-check-circle"></i> Acceptées
+        </button>
+        <button 
+          class="filter-chip" 
+          [class.active]="statusFilter === 'rejected'"
+          (click)="onStatusChange('rejected')">
+          <i class="fas fa-times-circle"></i> Refusées
+        </button>
+      </div>
+      
+      <button class="btn btn-outline" (click)="load()">
+        <i class="fas fa-sync-alt"></i> Actualiser
+      </button>
+    </div>
+  </div>
+
+  <!-- Loading Skeleton -->
+  @if (loading) {
+    <div class="skeleton-grid">
+      @for (item of [1,2,3,4,5,6]; track item) {
+        <div class="skeleton-card">
+          <div class="skeleton-header">
+            <div class="skeleton-avatar"></div>
+            <div class="skeleton-text">
+              <div class="skeleton-line" style="width: 70%;"></div>
+              <div class="skeleton-line" style="width: 50%;"></div>
+              <div class="skeleton-line" style="width: 60%;"></div>
+            </div>
+          </div>
+          <div class="skeleton-body">
+            <div class="skeleton-line" style="width: 90%;"></div>
+            <div class="skeleton-line" style="width: 80%;"></div>
+            <div class="skeleton-line" style="width: 70%;"></div>
+          </div>
+          <div class="skeleton-actions">
+            <div class="skeleton-btn"></div>
+            <div class="skeleton-btn"></div>
+            <div class="skeleton-btn"></div>
+          </div>
+        </div>
+      }
+    </div>
+  } 
+  
+  <!-- Applications Grid -->
+  @else if (filteredApplications.length === 0) {
+    <div class="empty-state-modern">
+      <div class="empty-icon">
+        <i class="fas fa-inbox"></i>
+      </div>
+      <h3>Aucune candidature trouvée</h3>
+      <p>Aucune demande d'inscription ne correspond à vos critères.</p>
+      <button class="btn btn-primary" style="margin-top: 1rem;" (click)="load()">
+        <i class="fas fa-sync-alt"></i> Actualiser
+      </button>
+    </div>
+  } 
+  
+  @else {
+    <div class="applications-grid">
+      @for (app of paginatedApplications; track app.id) {
+        <div class="application-card">
+          <div class="card-header-info">
+            <div class="avatar">
+              {{ getInitials(app) }}
+            </div>
+            <div class="applicant-info">
+              <h4>{{ app.agencyName }}</h4>
+              <span class="subtitle">{{ getFullName(app) }}</span>
+              <span class="email">{{ app.email }}</span>
+            </div>
+            <div class="status-badge" [class]="getStatusBadgeClass(app.status)">
+              <i [class]="getStatusIcon(app.status)"></i>
+              <span>{{ getStatusLabel(app.status) }}</span>
+            </div>
+          </div>
+
+          <div class="card-body-info">
+            <div class="info-row">
+              <i class="fas fa-calendar-alt"></i>
+              <span>Candidature : {{ formatDate(app.createdAt) }}</span>
+            </div>
+            @if (app.telephone) {
+              <div class="info-row">
+                <i class="fas fa-phone"></i>
+                <span>{{ app.telephone }}</span>
+              </div>
+            }
+            @if (app.description) {
+              <div class="description-section">
+                <div class="description-text">
+                  <i class="fas fa-align-left"></i>
+                  <span>{{ app.description | slice:0:100 }}{{ app.description.length > 100 ? '...' : '' }}</span>
+                </div>
+              </div>
+            }
+          </div>
+
+          <div class="card-actions">
+            <button class="btn btn-ghost" (click)="openDetail(app)">
+              <i class="fas fa-eye"></i> Détails
+            </button>
+            <button class="btn btn-outline" (click)="openRejectModal(app)" [disabled]="app.status === 'APPROVED'">
+              <i class="fas fa-times"></i> Rejeter
+            </button>
+            <button class="btn btn-success" (click)="approve(app)" [disabled]="actionLoading || app.status === 'APPROVED'">
+              <i class="fas fa-check"></i> Approuver
+            </button>
+          </div>
+        </div>
+      }
+    </div>
+
+    <!-- Pagination -->
+    @if (totalPages > 1) {
+      <div class="pagination-modern">
+        <button class="pagination-btn" (click)="goToPage(currentPage - 1)" [disabled]="currentPage === 1">
+          <i class="fas fa-chevron-left"></i>
+        </button>
+        
+        @for (page of getPageNumbers(); track page) {
+          <button 
+            class="pagination-btn" 
+            [class.active]="page === currentPage"
+            (click)="goToPage(page)">
+            {{ page }}
+          </button>
+        }
+        
+        <button class="pagination-btn" (click)="goToPage(currentPage + 1)" [disabled]="currentPage === totalPages">
+          <i class="fas fa-chevron-right"></i>
+        </button>
+      </div>
+    }
+  }
+</div>
+
+<!-- Detail Modal -->
+@if (detailModalOpen && selectedApp) {
+  <div class="modern-modal" (click)="closeDetail()">
+    <div class="modal-container" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>
+          <i class="fas fa-building" style="color: #6366f1;"></i>
+          Détails de la candidature
+        </h3>
+        <button class="modal-close" (click)="closeDetail()">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      
+      <div class="modal-body">
+        <div class="detail-grid">
+          <div class="detail-item">
+            <i class="fas fa-building"></i>
+            <div>
+              <div class="detail-label">Agence</div>
+              <div class="detail-value">{{ selectedApp.agencyName }}</div>
+            </div>
+          </div>
+          
+          <div class="detail-item">
+            <i class="fas fa-user-circle"></i>
+            <div>
+              <div class="detail-label">Responsable</div>
+              <div class="detail-value">{{ getFullName(selectedApp) }}</div>
+            </div>
+          </div>
+          
+          <div class="detail-item">
+            <i class="fas fa-envelope"></i>
+            <div>
+              <div class="detail-label">Email</div>
+              <div class="detail-value">{{ selectedApp.email }}</div>
+            </div>
+          </div>
+          
+          @if (selectedApp.telephone) {
+            <div class="detail-item">
+              <i class="fas fa-phone"></i>
+              <div>
+                <div class="detail-label">Téléphone</div>
+                <div class="detail-value">{{ selectedApp.telephone }}</div>
+              </div>
+            </div>
+          }
+          
+          <div class="detail-item">
+            <i class="fas fa-calendar-alt"></i>
+            <div>
+              <div class="detail-label">Date de candidature</div>
+              <div class="detail-value">{{ formatDate(selectedApp.createdAt) }}</div>
+            </div>
+          </div>
+          
+          <div class="detail-item">
+            <i class="fas fa-tag"></i>
+            <div>
+              <div class="detail-label">Statut</div>
+              <div class="detail-value">
+                <span class="status-badge" [class]="getStatusBadgeClass(selectedApp.status)" style="position: relative; top: auto; right: auto; display: inline-flex;">
+                  <i [class]="getStatusIcon(selectedApp.status)"></i>
+                  <span>{{ getStatusLabel(selectedApp.status) }}</span>
+                </span>
+              </div>
+            </div>
+          </div>
+          
+          @if (selectedApp.description) {
+            <div class="detail-item full-width">
+              <i class="fas fa-align-left"></i>
+              <div style="flex: 1;">
+                <div class="detail-label">Description</div>
+                <div class="detail-value">{{ selectedApp.description }}</div>
+              </div>
+            </div>
+          }
+        </div>
+      </div>
+      
+      <div class="modal-footer">
+        <button class="btn btn-outline" (click)="closeDetail()">
+          <i class="fas fa-times"></i> Fermer
+        </button>
+        @if (selectedApp.status !== 'APPROVED') {
+          <button class="btn btn-outline" (click)="closeDetail(); openRejectModal(selectedApp)">
+            <i class="fas fa-times-circle"></i> Rejeter
+          </button>
+          <button class="btn btn-success" (click)="approve(selectedApp)" [disabled]="actionLoading">
+            <i class="fas fa-check"></i> Approuver
+          </button>
+        }
+      </div>
+    </div>
+  </div>
+}
+
+<!-- Reject Modal -->
+@if (rejectModalOpen && rejectTarget) {
+  <div class="modern-modal" (click)="closeRejectModal()">
+    <div class="modal-container" style="max-width: 500px;" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>
+          <i class="fas fa-times-circle" style="color: #ef4444;"></i>
+          Rejeter la candidature
+        </h3>
+        <button class="modal-close" (click)="closeRejectModal()">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      
+      <div class="modal-body">
+        <p style="margin-bottom: 1rem; color: #374151;">
+          Vous êtes sur le point de rejeter la candidature de l'agence 
+          <strong>{{ rejectTarget.agencyName }}</strong>.
+        </p>
+        
+        <div class="form-group" style="margin-top: 1rem;">
+          <label style="display: block; font-size: 0.875rem; font-weight: 500; color: #374151; margin-bottom: 0.5rem;">
+            Motif du rejet <span style="color: #ef4444;">*</span>
+          </label>
+          <textarea
+            [(ngModel)]="rejectReason"
+            rows="4"
+            placeholder="Expliquez la raison du rejet..."
+            style="width: 100%; padding: 0.75rem; border: 1px solid #e5e7eb; border-radius: 0.75rem; font-size: 0.875rem; resize: vertical; font-family: inherit;"
+          ></textarea>
+        </div>
+      </div>
+      
+      <div class="modal-footer">
+        <button class="btn btn-outline" (click)="closeRejectModal()">
+          Annuler
+        </button>
+        <button
+          class="btn btn-danger"
+          (click)="confirmReject()"
+          [disabled]="!rejectReason.trim() || actionLoading"
+        >
+          <i class="fas fa-times-circle"></i> Confirmer le rejet
+        </button>
+      </div>
+    </div>
+  </div>
+}

@@ -1,0 +1,185 @@
+<section class="incoming-page">
+
+  <header class="inc-header">
+    <div>
+      <p class="inc-eyebrow">Mon agence</p>
+      <h2>Propositions de partage</h2>
+      <p class="inc-subtext">Propriétés proposées par la plateforme. Acceptez pour les intégrer à votre portefeuille.</p>
+    </div>
+  </header>
+
+  <!-- Success toast -->
+  <div *ngIf="successMessage" class="inc-toast success">
+    <i class="fas fa-check-circle"></i>
+    <span>{{ successMessage }}</span>
+  </div>
+
+  <!-- Error toast -->
+  <div *ngIf="errorMessage" class="inc-toast error">
+    <i class="fas fa-exclamation-circle"></i>
+    <span>{{ errorMessage }}</span>
+    <button (click)="errorMessage = ''">×</button>
+  </div>
+
+  <!-- Status filter tabs -->
+  <div class="inc-tabs">
+    <button class="inc-tab" [class.active]="statusFilter === ''" (click)="statusFilter = ''; applyFilter()">
+      Toutes <span class="tab-count">{{ counts.all }}</span>
+    </button>
+    <button class="inc-tab pending" [class.active]="statusFilter === 'PENDING'" (click)="statusFilter = 'PENDING'; applyFilter()">
+      En attente <span class="tab-count">{{ counts.pending }}</span>
+    </button>
+    <button class="inc-tab accepted" [class.active]="statusFilter === 'ACCEPTED'" (click)="statusFilter = 'ACCEPTED'; applyFilter()">
+      Acceptées <span class="tab-count">{{ counts.accepted }}</span>
+    </button>
+    <button class="inc-tab rejected" [class.active]="statusFilter === 'REJECTED'" (click)="statusFilter = 'REJECTED'; applyFilter()">
+      Refusées <span class="tab-count">{{ counts.rejected }}</span>
+    </button>
+  </div>
+
+  <!-- Loading / empty states -->
+  <div *ngIf="loading" class="inc-state">
+    <div class="spinner"></div>
+    <p>Chargement des demandes...</p>
+  </div>
+  <div *ngIf="!loading && !errorMessage && filtered.length === 0" class="inc-state empty">
+    <i class="fas fa-inbox"></i>
+    <p>Aucune demande à afficher.</p>
+  </div>
+
+  <!-- Request cards -->
+  <div class="inc-cards" *ngIf="!loading && filtered.length > 0">
+
+    <article class="inc-card" *ngFor="let r of filtered" [class.card-pending]="r.status === 'PENDING'">
+
+      <!-- Header: image + status -->
+      <div class="card-media">
+        <img *ngIf="getImageUrl(r)" [src]="getImageUrl(r)" [alt]="r.propertyTitle" (error)="$any($event.target).style.display='none'" />
+        <div *ngIf="!getImageUrl(r)" class="img-placeholder"><i class="fas fa-image"></i></div>
+        <span class="status-badge" [ngClass]="statusClass(r.status)">{{ statusLabel(r.status) }}</span>
+      </div>
+
+      <!-- Body -->
+      <div class="card-body">
+
+        <!-- Property info -->
+        <div class="card-top">
+          <div>
+            <p class="card-platform"><i class="fas fa-shield-halved"></i> Propriété plateforme</p>
+            <h3>{{ r.propertyTitle }}</h3>
+            <p class="card-location">
+              <i class="fas fa-location-dot"></i>
+              {{ r.propertyCity }}{{ r.propertyCountry ? ', ' + r.propertyCountry : '' }}
+            </p>
+          </div>
+          <div class="card-type-badge">{{ r.propertyType }}</div>
+        </div>
+
+        <!-- Key details grid -->
+        <div class="card-details">
+          <div class="detail-cell">
+            <p class="detail-label">Prix</p>
+            <p class="detail-value price-highlight">{{ formatPrice(r) }}</p>
+          </div>
+          <div class="detail-cell" *ngIf="r.propertySurface">
+            <p class="detail-label">Surface</p>
+            <p class="detail-value">{{ r.propertySurface }} m²</p>
+          </div>
+          <div class="detail-cell" *ngIf="r.propertyNbChambres">
+            <p class="detail-label">Chambres</p>
+            <p class="detail-value">{{ r.propertyNbChambres }}</p>
+          </div>
+        </div>
+
+        <!-- Commission box -->
+        <div class="commission-box">
+          <div class="commission-row">
+            <span class="commission-label">
+              <i class="fas fa-hand-holding-dollar"></i> Commission proposée
+            </span>
+            <span class="commission-value">{{ formatCommission(r) }}</span>
+          </div>
+          <div class="commission-row revenue-row">
+            <span class="commission-label">
+              <i class="fas fa-chart-line"></i> Revenu estimé pour votre agence
+            </span>
+            <span class="revenue-value">{{ formatRevenue(r) }}</span>
+          </div>
+          <p class="commission-note">
+            <i class="fas fa-info-circle"></i>
+            Seule la commission sera comptabilisée dans vos revenus, pas le prix de vente total.
+          </p>
+        </div>
+
+        <!-- Shared by + date -->
+        <div class="card-meta">
+          <span><i class="fas fa-user-shield"></i> Proposé par <strong>{{ r.sharedByName }}</strong></span>
+          <span><i class="fas fa-calendar"></i> {{ formatDate(r.createdAt) }}</span>
+        </div>
+
+        <!-- Message from super admin -->
+        <div class="card-message" *ngIf="r.message">
+          <i class="fas fa-comment-dots"></i>
+          <p>{{ r.message }}</p>
+        </div>
+
+        <!-- Rejection reason (own rejection) -->
+        <div class="rejection-info" *ngIf="r.status === 'REJECTED' && r.rejectionReason">
+          <i class="fas fa-circle-xmark"></i>
+          <p>Raison du refus : <em>{{ r.rejectionReason }}</em></p>
+        </div>
+
+        <!-- Actions: PENDING only -->
+        <div class="card-actions" *ngIf="r.status === 'PENDING'">
+          <button class="btn-reject" (click)="openRejectModal(r)" [disabled]="respondLoading">
+            <i class="fas fa-circle-xmark"></i> Refuser
+          </button>
+          <button class="btn-accept" (click)="accept(r)" [disabled]="respondLoading">
+            <i class="fas" [class.fa-circle-check]="!respondLoading" [class.fa-spinner]="respondLoading" [class.fa-spin]="respondLoading"></i>
+            {{ respondLoading ? 'Traitement...' : 'Accepter' }}
+          </button>
+        </div>
+
+        <!-- Already accepted -->
+        <div class="card-done accepted-done" *ngIf="r.status === 'ACCEPTED'">
+          <i class="fas fa-circle-check"></i>
+          Bien intégré à votre portefeuille le {{ formatDate(r.respondedAt) }}
+        </div>
+
+        <!-- Cancelled -->
+        <div class="card-done cancelled-done" *ngIf="r.status === 'CANCELLED'">
+          <i class="fas fa-ban"></i>
+          Demande annulée par la plateforme
+        </div>
+
+      </div>
+    </article>
+  </div>
+
+</section>
+
+<!-- ── Reject reason modal ── -->
+<div class="modal-backdrop" *ngIf="rejectModalOpen" (click)="closeRejectModal()"></div>
+<div class="reject-modal" *ngIf="rejectModalOpen">
+  <div class="reject-modal-header">
+    <h3><i class="fas fa-circle-xmark"></i> Refuser la demande</h3>
+    <button class="modal-close" (click)="closeRejectModal()"><i class="fas fa-times"></i></button>
+  </div>
+  <div class="reject-modal-body">
+    <p class="reject-property-name">{{ rejectTarget?.propertyTitle }}</p>
+    <label>Raison du refus <span class="optional-label">(optionnel)</span></label>
+    <textarea
+      class="reject-textarea"
+      rows="4"
+      placeholder="Expliquez pourquoi vous refusez ce bien..."
+      [(ngModel)]="rejectReason">
+    </textarea>
+  </div>
+  <div class="reject-modal-footer">
+    <button class="btn-ghost" (click)="closeRejectModal()">Annuler</button>
+    <button class="btn-confirm-reject" (click)="confirmReject()" [disabled]="respondLoading">
+      <i class="fas" [class.fa-circle-xmark]="!respondLoading" [class.fa-spinner]="respondLoading" [class.fa-spin]="respondLoading"></i>
+      {{ respondLoading ? 'Traitement...' : 'Confirmer le refus' }}
+    </button>
+  </div>
+</div>

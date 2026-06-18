@@ -1,0 +1,232 @@
+<div class="ma-modal-backdrop" (click)="close()"></div>
+
+<div class="ma-modal">
+  <!-- Header -->
+  <div class="ma-modal-header">
+    <div class="ma-modal-title">
+      <i class="fas fa-cube"></i>
+      <span>MapAnything 3D &mdash; Reconstruction GLB</span>
+    </div>
+    <button class="ma-close-btn" (click)="close()"><i class="fas fa-times"></i></button>
+  </div>
+
+  <!-- Body -->
+  <div class="ma-modal-body">
+
+    <!-- ── IDLE: file drop zone ── -->
+    @if (state === 'idle') {
+      <p class="ma-subtitle">
+        Générez un modèle <strong>GLB</strong> interactif à partir d'une vidéo grâce à
+        <strong>MapAnything</strong> (feed-forward, sans COLMAP). Compatible avec tous
+        les viewers 3D standard.
+      </p>
+
+      <div
+        class="ma-drop-zone"
+        [class.drag-over]="isDragOver"
+        [class.has-file]="selectedFile"
+        (dragover)="onDragOver($event)"
+        (dragleave)="onDragLeave($event)"
+        (drop)="onDrop($event)">
+
+        @if (!selectedFile) {
+          <i class="fas fa-film ma-drop-icon"></i>
+          <p>Glissez une vidéo ici ou <label class="ma-file-link" for="maFileInput">parcourez</label></p>
+          <small>MP4, MOV, AVI, MKV, WebM &middot; max 1 Go</small>
+          <input id="maFileInput" type="file" accept="video/*" hidden (change)="onFileSelected($event)">
+        } @else {
+          <i class="fas fa-check-circle ma-drop-icon ma-ok"></i>
+          <p class="ma-file-name">{{ selectedFile.name }}</p>
+          <small>{{ fileSizeLabel }}</small>
+          <button class="ma-clear-btn" type="button" (click)="clearFile()">
+            <i class="fas fa-trash"></i> Supprimer
+          </button>
+        }
+      </div>
+
+      <div class="ma-info-box">
+        <i class="fas fa-circle-info"></i>
+        <span>La reconstruction extrait <strong>~40 images</strong> de la vidéo.
+          Le modèle Apache 2.0 est utilisé (usage commercial autorisé).</span>
+      </div>
+
+      @if (!propertyId) {
+        <div class="ma-warn-box">
+          <i class="fas fa-triangle-exclamation"></i>
+          <span>Enregistrez d'abord le bien (bouton <strong>Sauvegarder</strong>) pour activer la reconstruction 3D.</span>
+        </div>
+      }
+
+      <button
+        class="ma-generate-btn"
+        type="button"
+        [disabled]="!selectedFile || !propertyId"
+        [title]="!propertyId ? 'Enregistrez d\'abord le bien' : (!selectedFile ? 'Sélectionnez une vidéo' : 'Lancer la reconstruction')"
+        (click)="startGeneration()">
+        <i class="fas fa-cube"></i> Générer le modèle 3D GLB
+      </button>
+    }
+
+    <!-- ── UPLOADING ── -->
+    @if (state === 'uploading') {
+      <div class="ma-progress-section">
+        <p>Envoi de la vidéo…</p>
+        <div class="ma-progress-bar">
+          <div class="ma-progress-fill" [style.width.%]="uploadPercent"></div>
+        </div>
+        <span>{{ uploadPercent }}%</span>
+      </div>
+    }
+
+    <!-- ── PROCESSING ── -->
+    @if (state === 'processing') {
+      <div class="ma-progress-section">
+        <p>{{ currentStep || 'Reconstruction 3D MapAnything en cours…' }}</p>
+
+        @if (processingPercent < 5) {
+          <div class="ma-progress-bar ma-indeterminate">
+            <div class="ma-progress-fill ma-anim"></div>
+          </div>
+        } @else {
+          <div class="ma-progress-bar">
+            <div class="ma-progress-fill" [style.width.%]="processingPercent"></div>
+          </div>
+          <span>{{ processingPercent }}%</span>
+        }
+
+        <div class="ma-steps-info">
+          <small>Pipeline : Extraction images → Filtrage flou → Inférence MapAnything → GLB</small>
+          <small class="ma-warn">Cette étape peut prendre plusieurs minutes selon le GPU disponible.</small>
+        </div>
+      </div>
+    }
+
+    <!-- ── PREVIEW: validation admin ── -->
+    @if (state === 'preview' && job) {
+      <div class="ma-validation-header">
+        <i class="fas fa-eye ma-validation-icon"></i>
+        <div>
+          <strong>Modèle 3D prêt — validation requise</strong>
+          <p>Vérifiez le rendu 3D avant de le publier sur la plateforme.</p>
+        </div>
+      </div>
+
+      <!-- Stats grid -->
+      <div class="ma-stats-grid">
+        <div class="ma-stat-card">
+          <i class="fas fa-weight-hanging"></i>
+          <span class="ma-stat-label">Taille GLB</span>
+          <span class="ma-stat-value">{{ glbSizeLabel }}</span>
+        </div>
+        <div class="ma-stat-card">
+          <i class="fas fa-bezier-curve"></i>
+          <span class="ma-stat-label">Vertices</span>
+          <span class="ma-stat-value">{{ vertexLabel }}</span>
+        </div>
+        <div class="ma-stat-card">
+          <i class="fas fa-shapes"></i>
+          <span class="ma-stat-label">Meshes</span>
+          <span class="ma-stat-value">{{ meshLabel }}</span>
+        </div>
+        <div class="ma-stat-card">
+          <i class="fas fa-clock"></i>
+          <span class="ma-stat-label">Génération</span>
+          <span class="ma-stat-value">{{ generationTimeLabel }}</span>
+        </div>
+      </div>
+
+      <!-- 3D Viewer (blob URL fetched with JWT) -->
+      @if (previewLoading) {
+        <div class="ma-preview-loading">
+          <i class="fas fa-spinner fa-spin"></i>
+          <span>Chargement de l'aperçu 3D…</span>
+        </div>
+      }
+      @if (previewUrl) {
+        <app-model-viewer
+          [src]="previewUrl"
+          format="glb"
+          [height]="'460px'">
+        </app-model-viewer>
+      }
+
+      <!-- Error within preview (e.g. accept/reject failed) -->
+      @if (errorMessage) {
+        <div class="ma-error-box ma-error-inline">
+          <i class="fas fa-exclamation-triangle"></i>
+          <p>{{ errorMessage }}</p>
+        </div>
+      }
+
+      <!-- Accept / Reject actions -->
+      <div class="ma-validation-actions">
+        <button
+          class="ma-accept-btn"
+          type="button"
+          [disabled]="actionLoading"
+          (click)="acceptModel()">
+          @if (actionLoading) {
+            <i class="fas fa-spinner fa-spin"></i>
+          } @else {
+            <i class="fas fa-check-circle"></i>
+          }
+          Accepter le modèle
+        </button>
+        <button
+          class="ma-reject-btn"
+          type="button"
+          [disabled]="actionLoading"
+          (click)="rejectModel()">
+          @if (actionLoading) {
+            <i class="fas fa-spinner fa-spin"></i>
+          } @else {
+            <i class="fas fa-times-circle"></i>
+          }
+          Refuser et recommencer
+        </button>
+      </div>
+    }
+
+    <!-- ── DONE: model published ── -->
+    @if (state === 'done' && job) {
+      <div class="ma-success-banner">
+        <i class="fas fa-check-circle"></i>
+        <span>Modèle 3D GLB accepté et publié avec succès !</span>
+      </div>
+
+      @if (job.glbUrl) {
+        <app-model-viewer
+          [src]="job.glbUrl"
+          format="glb"
+          [height]="'460px'">
+        </app-model-viewer>
+      }
+
+      <div class="ma-done-actions">
+        @if (job.glbUrl) {
+          <a
+            class="ma-download-btn"
+            [href]="job.glbUrl"
+            [download]="'reconstruction_3d_' + (propertyId || '') + '.glb'">
+            <i class="fas fa-download"></i> Télécharger le .glb
+          </a>
+        }
+        <button class="ma-close-action-btn" type="button" (click)="close()">
+          <i class="fas fa-check"></i> Fermer
+        </button>
+      </div>
+    }
+
+    <!-- ── ERROR ── -->
+    @if (state === 'error') {
+      <div class="ma-error-box">
+        <i class="fas fa-exclamation-triangle"></i>
+        <p>{{ errorMessage }}</p>
+      </div>
+      <button class="ma-retry-btn" type="button" (click)="state = 'idle'; selectedFile = null">
+        <i class="fas fa-redo"></i> Recommencer
+      </button>
+    }
+
+  </div>
+</div>

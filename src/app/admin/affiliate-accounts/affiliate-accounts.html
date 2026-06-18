@@ -1,0 +1,243 @@
+<div class="page-wrapper">
+  <div class="page-header">
+    <div class="page-header-left">
+      <h2><i class="fas fa-users-cog"></i> Comptes Affiliés</h2>
+      <p class="page-subtitle">Gérez les affiliés actifs, suspendus et rejetés</p>
+    </div>
+    <div class="page-header-right">
+      <button class="btn btn-outline" (click)="load()">
+        <i class="fas fa-sync-alt"></i> Actualiser
+      </button>
+    </div>
+  </div>
+
+  <div class="alert alert-success" *ngIf="successMessage" (click)="clearMessages()">
+    <i class="fas fa-check-circle"></i> {{ successMessage }}
+  </div>
+  <div class="alert alert-danger" *ngIf="errorMessage" (click)="clearMessages()">
+    <i class="fas fa-exclamation-circle"></i> {{ errorMessage }}
+  </div>
+
+  <!-- Filters -->
+  <div class="filter-bar">
+    <input type="text" placeholder="Rechercher par nom ou email…" [(ngModel)]="searchTerm" (input)="applyFilters()" class="form-control" style="max-width:280px">
+    <select [(ngModel)]="statusFilter" (change)="applyFilters()">
+      <option value="">Tous les statuts</option>
+      <option value="ACTIVE">Actifs</option>
+      <option value="SUSPENDED">Suspendus</option>
+      <option value="REJECTED">Rejetés</option>
+    </select>
+  </div>
+
+  <!-- Loading -->
+  @if (loading) {
+    <div class="loading-state">
+      <i class="fas fa-spinner fa-spin"></i><span>Chargement…</span>
+    </div>
+  }
+  @if (!loading && filtered.length === 0) {
+    <div class="empty-state">
+      <i class="fas fa-user-slash fa-3x"></i>
+      <h3>Aucun affilié trouvé</h3>
+      <p>Modifiez vos critères de recherche.</p>
+    </div>
+  }
+
+  <!-- Table -->
+  @if (!loading && filtered.length > 0) {
+    <div class="table-card">
+      <div class="table-header">
+        <h3><i class="fas fa-list"></i> {{ filtered.length }} affilié{{ filtered.length > 1 ? 's' : '' }}</h3>
+      </div>
+      <div class="offers-wrapper">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Affilié</th>
+              <th>Zones</th>
+              <th>Statut</th>
+              <th>Récompense</th>
+              <th>Inscription</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (a of filtered; track a.userId) {
+              <tr>
+                <td>
+                  <div style="display:flex;align-items:center;gap:0.625rem;">
+                    <div class="avatar-circle" style="width:36px;height:36px;font-size:0.875rem;">
+                      {{ a.prenom.charAt(0).toUpperCase() }}
+                    </div>
+                    <div>
+                      <div style="font-weight:600;font-size:0.875rem;">{{ a.prenom }} {{ a.nom }}</div>
+                      <div style="font-size:0.775rem;color:var(--text-muted);">{{ a.email }}</div>
+                    </div>
+                  </div>
+                </td>
+                <td>
+                  <div class="regions-tags">
+                    @for (r of a.regions; track r.id) {
+                      <span class="region-tag">{{ r.city ?? r.regionName }}</span>
+                    }
+                    @if (!a.regions?.length) {
+                      <span style="color:var(--text-muted);font-size:0.8rem;">—</span>
+                    }
+                  </div>
+                </td>
+                <td><span class="status-badge" [ngClass]="getStatusClass(a.status)">{{ formatStatus(a.status) }}</span></td>
+                <td style="color:var(--text-muted);font-size:0.8rem;">—</td>
+                <td style="font-size:0.8125rem;color:var(--text-muted);">{{ formatDate(a.createdAt) }}</td>
+                <td>
+                  <div style="display:flex;gap:0.375rem;">
+                    <button class="btn btn-ghost btn-sm" (click)="openStats(a)" title="Voir les stats">
+                      <i class="fas fa-chart-bar"></i>
+                    </button>
+                    @if (a.status === 'SUSPENDED' || a.status === 'REJECTED') {
+                      <button class="btn btn-success btn-sm" (click)="activate(a)" [disabled]="actionLoading">
+                        <i class="fas fa-check"></i> Réactiver
+                      </button>
+                    }
+                    @if (a.status === 'ACTIVE') {
+                      <button class="btn btn-danger-outline btn-sm" (click)="openSuspendModal(a)">
+                        <i class="fas fa-ban"></i> Suspendre
+                      </button>
+                    }
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+  }
+</div>
+
+<!-- Stats Modal -->
+@if (statsModalOpen) {
+  <div class="modal-overlay" (click)="closeStats()">
+    <div class="modal-box" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3><i class="fas fa-chart-bar text-primary"></i> Statistiques affilié</h3>
+        <button class="modal-close" (click)="closeStats()"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="modal-body">
+        @if (statsLoading) {
+          <div class="loading-state" style="padding:2rem">
+            <i class="fas fa-spinner fa-spin"></i><span>Chargement…</span>
+          </div>
+        }
+        @if (!statsLoading && selectedStats) {
+          <div class="kpi-grid" style="grid-template-columns: repeat(3,1fr);">
+            <div class="kpi-card">
+              <div class="kpi-icon kpi-blue"><i class="fas fa-handshake"></i></div>
+              <div class="kpi-value">{{ selectedStats.totalOffersAccepted }}</div>
+              <p class="kpi-label">Offres acceptées</p>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-icon kpi-orange"><i class="fas fa-clock"></i></div>
+              <div class="kpi-value">{{ selectedStats.totalOffersPending }}</div>
+              <p class="kpi-label">En attente</p>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-icon kpi-green"><i class="fas fa-coins"></i></div>
+              <div class="kpi-value" style="font-size:1.25rem;">{{ selectedStats.totalRevenue | number:'1.0-0' }}</div>
+              <p class="kpi-label">Revenus TND</p>
+            </div>
+          </div>
+          <div class="detail-row"><label>Total revenus</label><span>{{ selectedStats.totalRevenue | number:'1.0-2' }} TND</span></div>
+          @if (selectedStats.monthlyRewardAmount) {
+            <div class="detail-row"><label>Récompense ce mois</label>
+              <span class="bonus-badge reward-badge"><i class="fas fa-coins"></i> {{ selectedStats.monthlyRewardAmount | number:'1.0-0' }} TND</span>
+            </div>
+          }
+          @if (selectedStats.rank) {
+            <div class="detail-row"><label>Classement</label>
+              <span class="rank-medal" [ngClass]="'rank-'+selectedStats.rank">{{ selectedStats.rank }}</span>
+            </div>
+          }
+          @if (selectedStats.regions?.length) {
+            <div class="regions-section">
+              <div class="regions-label"><i class="fas fa-map-marker-alt"></i> Zones couvertes:</div>
+              <div class="regions-tags">
+                @for (r of selectedStats.regions; track r.id) {
+                  <span class="region-tag">{{ r.city ?? r.regionName }}</span>
+                }
+              </div>
+            </div>
+          }
+        }
+
+        <!-- Clients apportés par cet affilié (CRM leads — aucun compte User) -->
+        <div class="acust-section">
+          <div class="acust-title">
+            <i class="fas fa-user-friends"></i>
+            Clients apportés
+            @if (!customersLoading) { <span class="acust-count">{{ selectedCustomers.length }}</span> }
+          </div>
+
+          @if (customersLoading) {
+            <div class="acust-loading"><i class="fas fa-spinner fa-spin"></i> Chargement…</div>
+          } @else if (selectedCustomers.length === 0) {
+            <div class="acust-empty">Aucun client apporté pour le moment.</div>
+          } @else {
+            <div class="acust-list">
+              @for (c of selectedCustomers; track c.id) {
+                <div class="acust-item">
+                  <div class="acust-main">
+                    <div class="acust-buyer">{{ c.buyerName }}</div>
+                    <div class="acust-prop">
+                      <i class="fas fa-home"></i> {{ c.propertyTitle || '—' }}
+                      <span class="acust-type" [class.is-rent]="c.transactionType === 'RENT'">
+                        {{ c.transactionType === 'RENT' ? 'Location' : 'Vente' }}
+                      </span>
+                    </div>
+                  </div>
+                  <div class="acust-meta">
+                    <div class="acust-amount">{{ c.propertyPrice | number:'1.0-0' }} TND</div>
+                    <div class="acust-comm">
+                      Comm. {{ c.commissionAmount | number:'1.0-0' }} TND
+                      <span class="acust-status" [class.paid]="c.commissionPaid">
+                        {{ c.commissionPaid ? 'Payée' : 'En attente' }}
+                      </span>
+                    </div>
+                    <div class="acust-date">{{ c.createdAt | date:'dd/MM/yyyy' }}</div>
+                  </div>
+                </div>
+              }
+            </div>
+          }
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" (click)="closeStats()">Fermer</button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- Suspend Modal -->
+@if (suspendModalOpen) {
+  <div class="modal-overlay" (click)="closeSuspendModal()">
+    <div class="modal-box modal-sm" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3><i class="fas fa-ban text-danger"></i> Suspendre l'affilié</h3>
+        <button class="modal-close" (click)="closeSuspendModal()"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="modal-body">
+        <p>Vous allez suspendre <strong>{{ suspendTarget?.prenom }} {{ suspendTarget?.nom }}</strong>. L'accès sera désactivé.</p>
+        <div class="form-group">
+          <label>Motif de suspension <span class="required">*</span></label>
+          <textarea [(ngModel)]="suspendReason" rows="3" class="form-control" placeholder="Raison de la suspension…"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" (click)="closeSuspendModal()">Annuler</button>
+        <button class="btn btn-danger" (click)="confirmSuspend()" [disabled]="!suspendReason.trim() || actionLoading">
+          <i class="fas fa-ban"></i> Suspendre
+        </button>
+      </div>
+    </div>
+  </div>
+}

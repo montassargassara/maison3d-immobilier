@@ -1,0 +1,353 @@
+<div class="settings-page">
+  <!-- Header -->
+  <div class="page-header">
+    <div class="header-left">
+      <h2 class="page-title">
+        <span class="title-icon"><i class="bi bi-gear-fill"></i></span>
+        Paramètres du compte
+      </h2>
+      <p class="page-subtitle">Gérez votre profil, sécurité et apparence</p>
+    </div>
+  </div>
+
+  <!-- Loading skeleton -->
+  <div *ngIf="loading" class="loading-state">
+    <div class="skeleton-card"></div>
+  </div>
+
+  <!-- Content -->
+  <div *ngIf="!loading" class="settings-layout">
+    <!-- Sidebar nav -->
+    <nav class="settings-nav">
+      <div class="nav-user-info">
+        <div class="nav-avatar">
+          <img *ngIf="currentAvatarUrl" [src]="currentAvatarUrl" alt="Avatar" class="avatar-img" />
+          <span *ngIf="!currentAvatarUrl" class="avatar-initials">{{ userInitials }}</span>
+        </div>
+        <div class="nav-user-details">
+          <span class="nav-user-name">{{ profile?.prenom }} {{ profile?.nom }}</span>
+          <span class="nav-user-role">{{ formatRole(profile?.role || '') }}</span>
+        </div>
+      </div>
+
+      <ul class="nav-list">
+        <li>
+          <button class="nav-item" [class.active]="activeTab === 'profil'" (click)="setTab('profil')">
+            <i class="bi bi-person-fill"></i>
+            <span>Informations personnelles</span>
+            <i class="bi bi-chevron-right nav-arrow"></i>
+          </button>
+        </li>
+        <li>
+          <button class="nav-item" [class.active]="activeTab === 'securite'" (click)="setTab('securite')">
+            <i class="bi bi-shield-lock-fill"></i>
+            <span>Sécurité</span>
+            <i class="bi bi-chevron-right nav-arrow"></i>
+          </button>
+        </li>
+        <li>
+          <button class="nav-item" [class.active]="activeTab === 'avatar'" (click)="setTab('avatar')">
+            <i class="bi bi-image-fill"></i>
+            <span>Photo de profil</span>
+            <i class="bi bi-chevron-right nav-arrow"></i>
+          </button>
+        </li>
+      </ul>
+    </nav>
+
+    <!-- Tab content -->
+    <div class="settings-content">
+
+      <!-- ── Profil tab ─────────────────────────────────────────────── -->
+      <div *ngIf="activeTab === 'profil'" class="tab-panel">
+        <div class="panel-header">
+          <h3 class="panel-title"><i class="bi bi-person-fill"></i> Informations personnelles</h3>
+          <p class="panel-desc">Mettez à jour vos informations de contact visibles sur la plateforme.</p>
+        </div>
+
+        <div class="alert alert-success" *ngIf="profileSuccess">
+          <i class="bi bi-check-circle-fill"></i> {{ profileSuccess }}
+        </div>
+        <div class="alert alert-danger" *ngIf="profileError">
+          <i class="bi bi-exclamation-circle-fill"></i> {{ profileError }}
+        </div>
+
+        <form (ngSubmit)="saveProfile()" #profileF="ngForm" class="settings-form">
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Prénom <span class="required">*</span></label>
+              <div class="input-with-icon">
+                <i class="bi bi-person input-icon"></i>
+                <input
+                  type="text"
+                  class="form-control"
+                  [(ngModel)]="profileForm.prenom"
+                  name="prenom"
+                  required
+                  minlength="2"
+                  placeholder="Votre prénom"
+                />
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Nom <span class="required">*</span></label>
+              <div class="input-with-icon">
+                <i class="bi bi-person input-icon"></i>
+                <input
+                  type="text"
+                  class="form-control"
+                  [(ngModel)]="profileForm.nom"
+                  name="nom"
+                  required
+                  minlength="2"
+                  placeholder="Votre nom"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Adresse email <span class="required">*</span></label>
+            <div class="input-with-icon">
+              <i class="bi bi-envelope input-icon"></i>
+              <input
+                type="email"
+                class="form-control"
+                [(ngModel)]="profileForm.email"
+                name="email"
+                required
+                placeholder="votre@email.com"
+              />
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Téléphone <span class="optional">(optionnel)</span></label>
+            <div class="input-with-icon">
+              <i class="bi bi-telephone input-icon"></i>
+              <input
+                type="tel"
+                class="form-control"
+                [(ngModel)]="profileForm.telephone"
+                name="telephone"
+                placeholder="+216 XX XXX XXX"
+              />
+            </div>
+          </div>
+
+          <div class="form-footer">
+            <button
+              type="submit"
+              class="btn-primary-action"
+              [disabled]="profileSaving || profileF.invalid"
+            >
+              <span *ngIf="!profileSaving"><i class="bi bi-check2"></i> Enregistrer les modifications</span>
+              <span *ngIf="profileSaving"><i class="bi bi-arrow-repeat spin"></i> Enregistrement...</span>
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- ── Sécurité tab ────────────────────────────────────────────── -->
+      <div *ngIf="activeTab === 'securite'" class="tab-panel">
+        <div class="panel-header">
+          <h3 class="panel-title"><i class="bi bi-shield-lock-fill"></i> Changer le mot de passe</h3>
+          <p class="panel-desc">Choisissez un mot de passe fort d'au moins 8 caractères.</p>
+        </div>
+
+        <div class="alert alert-success" *ngIf="passwordSuccess">
+          <i class="bi bi-check-circle-fill"></i> {{ passwordSuccess }}
+        </div>
+        <div class="alert alert-danger" *ngIf="passwordError">
+          <i class="bi bi-exclamation-circle-fill"></i> {{ passwordError }}
+        </div>
+
+        <form (ngSubmit)="savePassword()" class="settings-form">
+          <div class="form-group">
+            <label class="form-label">Mot de passe actuel <span class="required">*</span></label>
+            <div class="input-with-icon password-field">
+              <i class="bi bi-lock input-icon"></i>
+              <input
+                [type]="showCurrent ? 'text' : 'password'"
+                class="form-control"
+                [(ngModel)]="passwordForm.currentPassword"
+                name="currentPassword"
+                required
+                placeholder="Votre mot de passe actuel"
+              />
+              <button type="button" class="toggle-eye" (click)="showCurrent = !showCurrent">
+                <i [class]="showCurrent ? 'bi bi-eye-slash' : 'bi bi-eye'"></i>
+              </button>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Nouveau mot de passe <span class="required">*</span></label>
+            <div class="input-with-icon password-field">
+              <i class="bi bi-lock-fill input-icon"></i>
+              <input
+                [type]="showNew ? 'text' : 'password'"
+                class="form-control"
+                [(ngModel)]="passwordForm.newPassword"
+                name="newPassword"
+                required
+                minlength="8"
+                placeholder="Minimum 8 caractères"
+              />
+              <button type="button" class="toggle-eye" (click)="showNew = !showNew">
+                <i [class]="showNew ? 'bi bi-eye-slash' : 'bi bi-eye'"></i>
+              </button>
+            </div>
+            <!-- Strength meter -->
+            <div class="strength-meter" *ngIf="passwordForm.newPassword">
+              <div class="strength-bar">
+                <div
+                  class="strength-fill"
+                  [class]="passwordStrengthClass"
+                  [style.width.%]="passwordStrength * 25"
+                ></div>
+              </div>
+              <span class="strength-label" [class]="passwordStrengthClass">{{ passwordStrengthLabel }}</span>
+            </div>
+            <div class="password-hints" *ngIf="passwordForm.newPassword">
+              <span [class.hint-ok]="passwordForm.newPassword.length >= 8">
+                <i class="bi" [class.bi-check-circle-fill]="passwordForm.newPassword.length >= 8" [class.bi-circle]="passwordForm.newPassword.length < 8"></i>
+                8 caractères minimum
+              </span>
+              <span [class.hint-ok]="/[A-Z]/.test(passwordForm.newPassword)">
+                <i class="bi" [class.bi-check-circle-fill]="/[A-Z]/.test(passwordForm.newPassword)" [class.bi-circle]="!/[A-Z]/.test(passwordForm.newPassword)"></i>
+                Une majuscule
+              </span>
+              <span [class.hint-ok]="/[0-9]/.test(passwordForm.newPassword)">
+                <i class="bi" [class.bi-check-circle-fill]="/[0-9]/.test(passwordForm.newPassword)" [class.bi-circle]="!/[0-9]/.test(passwordForm.newPassword)"></i>
+                Un chiffre
+              </span>
+              <span [class.hint-ok]="/[^A-Za-z0-9]/.test(passwordForm.newPassword)">
+                <i class="bi" [class.bi-check-circle-fill]="/[^A-Za-z0-9]/.test(passwordForm.newPassword)" [class.bi-circle]="!/[^A-Za-z0-9]/.test(passwordForm.newPassword)"></i>
+                Un caractère spécial
+              </span>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Confirmer le mot de passe <span class="required">*</span></label>
+            <div class="input-with-icon password-field">
+              <i class="bi bi-lock-fill input-icon"></i>
+              <input
+                [type]="showConfirm ? 'text' : 'password'"
+                class="form-control"
+                [(ngModel)]="passwordForm.confirmPassword"
+                name="confirmPassword"
+                required
+                placeholder="Répétez le nouveau mot de passe"
+              />
+              <button type="button" class="toggle-eye" (click)="showConfirm = !showConfirm">
+                <i [class]="showConfirm ? 'bi bi-eye-slash' : 'bi bi-eye'"></i>
+              </button>
+            </div>
+            <div
+              class="confirm-feedback"
+              *ngIf="passwordForm.confirmPassword"
+              [class.match]="passwordsMatch"
+              [class.no-match]="!passwordsMatch"
+            >
+              <i class="bi" [class.bi-check-circle-fill]="passwordsMatch" [class.bi-x-circle-fill]="!passwordsMatch"></i>
+              {{ passwordsMatch ? 'Les mots de passe correspondent' : 'Les mots de passe ne correspondent pas' }}
+            </div>
+          </div>
+
+          <div class="form-footer">
+            <button
+              type="submit"
+              class="btn-primary-action"
+              [disabled]="passwordSaving || !passwordForm.currentPassword || !passwordsMatch || passwordStrength < 2"
+            >
+              <span *ngIf="!passwordSaving"><i class="bi bi-shield-check"></i> Changer le mot de passe</span>
+              <span *ngIf="passwordSaving"><i class="bi bi-arrow-repeat spin"></i> Modification...</span>
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- ── Avatar tab ─────────────────────────────────────────────── -->
+      <div *ngIf="activeTab === 'avatar'" class="tab-panel">
+        <div class="panel-header">
+          <h3 class="panel-title"><i class="bi bi-image-fill"></i> Photo de profil</h3>
+          <p class="panel-desc">Formats acceptés : JPG, PNG, WEBP — taille maximale 5 MB.</p>
+        </div>
+
+        <div class="alert alert-success" *ngIf="avatarSuccess">
+          <i class="bi bi-check-circle-fill"></i> {{ avatarSuccess }}
+        </div>
+        <div class="alert alert-danger" *ngIf="avatarError">
+          <i class="bi bi-exclamation-circle-fill"></i> {{ avatarError }}
+        </div>
+
+        <div class="avatar-section">
+          <!-- Current / Preview -->
+          <div class="avatar-display">
+            <div class="avatar-frame">
+              <img *ngIf="previewUrl" [src]="previewUrl" alt="Aperçu" class="avatar-full" />
+              <img *ngIf="!previewUrl && currentAvatarUrl" [src]="currentAvatarUrl" alt="Avatar actuel" class="avatar-full" />
+              <div *ngIf="!previewUrl && !currentAvatarUrl" class="avatar-placeholder-large">
+                {{ userInitials }}
+              </div>
+              <div *ngIf="previewUrl" class="preview-badge">Aperçu</div>
+            </div>
+            <div class="avatar-actions-inline">
+              <button class="btn-icon-action upload-btn" (click)="triggerFileInput()" [disabled]="avatarUploading">
+                <i class="bi bi-upload"></i> Choisir une photo
+              </button>
+              <button
+                *ngIf="currentAvatarUrl && !previewUrl"
+                class="btn-icon-action delete-btn"
+                (click)="deleteAvatar()"
+                [disabled]="avatarDeleting"
+              >
+                <i class="bi bi-trash3"></i>
+                {{ avatarDeleting ? 'Suppression...' : 'Supprimer' }}
+              </button>
+            </div>
+          </div>
+
+          <!-- Preview confirmation zone -->
+          <div class="preview-zone" *ngIf="previewUrl">
+            <div class="preview-info">
+              <i class="bi bi-info-circle"></i>
+              Vérifiez l'aperçu avant de confirmer l'upload.
+            </div>
+            <div class="preview-actions">
+              <button class="btn-secondary-action" (click)="cancelPreview()" [disabled]="avatarUploading">
+                <i class="bi bi-x-lg"></i> Annuler
+              </button>
+              <button class="btn-primary-action" (click)="uploadAvatar()" [disabled]="avatarUploading">
+                <span *ngIf="!avatarUploading"><i class="bi bi-cloud-upload"></i> Confirmer l'upload</span>
+                <span *ngIf="avatarUploading"><i class="bi bi-arrow-repeat spin"></i> Upload en cours...</span>
+              </button>
+            </div>
+          </div>
+
+          <input
+            #fileInput
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            style="display:none"
+            (change)="onFileSelected($event)"
+          />
+
+          <!-- Tips -->
+          <div class="avatar-tips">
+            <h5 class="tips-title"><i class="bi bi-lightbulb"></i> Conseils</h5>
+            <ul>
+              <li>Utilisez une photo carrée pour un meilleur résultat.</li>
+              <li>Résolution recommandée : 400 × 400 pixels minimum.</li>
+              <li>Formats autorisés : JPG, PNG, WEBP.</li>
+              <li>Taille maximale : 5 MB.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /settings-content -->
+  </div><!-- /settings-layout -->
+</div>

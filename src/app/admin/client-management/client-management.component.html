@@ -1,0 +1,1257 @@
+<!-- CRM Page -->
+<div class="crm-page">
+
+  <!-- ── Top bar ──────────────────────────────────────────────────────────── -->
+  <div class="crm-topbar">
+    <div>
+      <h1 class="crm-title"><i class="fas fa-users"></i> Gestion des clients</h1>
+      <p class="crm-subtitle">Base clients CRM · Acheteurs &amp; affiliés immobiliers</p>
+    </div>
+    <button class="crm-add-btn" (click)="openCreateModal()">
+      <i class="fas fa-user-plus"></i> Ajouter
+    </button>
+  </div>
+
+  <!-- ── Alerts ───────────────────────────────────────────────────────────── -->
+  <div *ngIf="errorMessage" class="crm-alert crm-alert-danger">
+    <i class="fas fa-exclamation-circle"></i> {{ errorMessage }}
+    <button (click)="errorMessage=''"><i class="fas fa-times"></i></button>
+  </div>
+  <div *ngIf="successMessage" class="crm-alert crm-alert-success">
+    <i class="fas fa-check-circle"></i> {{ successMessage }}
+    <button (click)="successMessage=''"><i class="fas fa-times"></i></button>
+  </div>
+
+  <!-- ── Metrics strip ────────────────────────────────────────────────────── -->
+  <div class="crm-metrics">
+    <div class="metric-card">
+      <div class="metric-icon mc-blue"><i class="fas fa-user"></i></div>
+      <div class="metric-body">
+        <div class="metric-val">{{ stats.totalClientsNormaux }}</div>
+        <div class="metric-lbl">Clients</div>
+      </div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-icon mc-amber"><i class="fas fa-handshake"></i></div>
+      <div class="metric-body">
+        <div class="metric-val">{{ stats.totalClientsAffilies }}</div>
+        <div class="metric-lbl">Affiliés</div>
+      </div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-icon mc-green"><i class="fas fa-user-check"></i></div>
+      <div class="metric-body">
+        <div class="metric-val">{{ stats.totalClientsActifs }}</div>
+        <div class="metric-lbl">Actifs</div>
+      </div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-icon mc-purple"><i class="fas fa-chart-line"></i></div>
+      <div class="metric-body">
+        <div class="metric-val">{{ formatCurrency(stats.ventesMois) }}</div>
+        <div class="metric-lbl">Ventes du mois</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Toolbar: tabs + search + filters ────────────────────────────────── -->
+  <div class="crm-toolbar">
+    <!-- Tabs -->
+    <div class="crm-tabs">
+      <button class="crm-tab" [class.crm-tab-active]="activeTab === 'clients'" (click)="setActiveTab('clients')">
+        <i class="fas fa-user"></i> Clients
+        <span class="ctab-badge">{{ stats.totalClientsNormaux }}</span>
+      </button>
+      <button class="crm-tab" [class.crm-tab-active]="activeTab === 'affiliates'" (click)="setActiveTab('affiliates')">
+        <i class="fas fa-handshake"></i> Affiliés
+        <span class="ctab-badge ctab-badge-amber">{{ stats.totalClientsAffilies }}</span>
+      </button>
+      <button class="crm-tab" [class.crm-tab-active]="activeTab === 'affiliate-customers'" (click)="setActiveTab('affiliate-customers')">
+        <i class="fas fa-user-friends"></i> Clients affiliés
+        <span class="ctab-badge ctab-badge-amber" *ngIf="affiliateCustomersLoaded">{{ affiliateCustomers.length }}</span>
+      </button>
+    </div>
+
+    <!-- Search -->
+    <div class="crm-search-wrap">
+      <i class="fas fa-search crm-search-ico"></i>
+      <input class="crm-search-input" type="text"
+             [(ngModel)]="searchTerm" (ngModelChange)="applyFilters()"
+             [placeholder]="activeTab === 'affiliates' ? 'Rechercher un affilié…' : 'Rechercher un client…'">
+      <button class="crm-search-clear" *ngIf="searchTerm" (click)="searchTerm=''; applyFilters()">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+
+    <!-- Filters -->
+    <div class="crm-filter-group">
+      <select class="crm-filter-select" [(ngModel)]="statusFilter" (ngModelChange)="applyFilters()">
+        <option value="">Tous statuts</option>
+        <option value="active">Actifs</option>
+        <option value="inactive">Inactifs</option>
+      </select>
+      <ng-container *ngIf="activeTab === 'clients'">
+        <input type="number" class="crm-filter-input" [(ngModel)]="minBudget" (ngModelChange)="applyFilters()" placeholder="Budget min">
+        <input type="number" class="crm-filter-input" [(ngModel)]="maxBudget" (ngModelChange)="applyFilters()" placeholder="Budget max">
+      </ng-container>
+      <button class="crm-reset-btn" *ngIf="searchTerm || statusFilter || minBudget || maxBudget" (click)="resetFilters()" title="Réinitialiser">
+        <i class="fas fa-undo-alt"></i>
+      </button>
+    </div>
+  </div>
+
+  <!-- ── CRM List panel ───────────────────────────────────────────────────── -->
+  <div class="crm-panel">
+
+    <!-- Loading -->
+    <div class="crm-loading" *ngIf="loading">
+      <div class="spinner-border text-primary" role="status"></div>
+      <p>Chargement…</p>
+    </div>
+
+    <ng-container *ngIf="!loading && activeTab !== 'affiliate-customers'">
+
+      <!-- Column header (desktop only) -->
+      <div class="crm-head">
+        <div class="ch ch-client" (click)="sort('prenom')">
+          Client <i class="fas ms-1" [ngClass]="getSortIcon('prenom')"></i>
+        </div>
+        <div class="ch ch-contact">Contact</div>
+        <div class="ch ch-location">Localisation</div>
+        <div class="ch ch-budget" (click)="activeTab !== 'affiliates' ? sort('budgetEstime') : null">
+          <ng-container *ngIf="activeTab !== 'affiliates'">Budget <i class="fas ms-1" [ngClass]="getSortIcon('budgetEstime')"></i></ng-container>
+          <ng-container *ngIf="activeTab === 'affiliates'">Ventes</ng-container>
+        </div>
+        <div class="ch ch-achats" (click)="activeTab !== 'affiliates' ? sort('nombreAchats') : null">
+          <ng-container *ngIf="activeTab !== 'affiliates'">Achats <i class="fas ms-1" [ngClass]="getSortIcon('nombreAchats')"></i></ng-container>
+          <ng-container *ngIf="activeTab === 'affiliates'">Ranking</ng-container>
+        </div>
+        <div class="ch ch-locations">
+          <ng-container *ngIf="activeTab !== 'affiliates'">Locations</ng-container>
+          <ng-container *ngIf="activeTab === 'affiliates'">Zone</ng-container>
+        </div>
+        <div class="ch ch-status" (click)="sort('isActive')">
+          Statut <i class="fas ms-1" [ngClass]="getSortIcon('isActive')"></i>
+        </div>
+        <div class="ch ch-actions">Actions</div>
+      </div>
+
+      <!-- Empty state -->
+      <div class="crm-empty" *ngIf="filteredClients.length === 0">
+        <div class="crm-empty-icon"><i class="fas fa-users"></i></div>
+        <p>Aucun {{ activeTab === 'affiliates' ? 'affilié' : 'client' }} trouvé</p>
+        <button class="crm-add-btn crm-add-btn-sm" (click)="openCreateModal()">
+          <i class="fas fa-user-plus"></i> Ajouter
+        </button>
+      </div>
+
+      <!-- Rows -->
+      <div class="crm-row"
+           *ngFor="let client of filteredClients | slice:(page*pageSize):((page+1)*pageSize)">
+
+        <!-- ① Client -->
+        <div class="cc cc-client">
+          <div class="c-avatar" [style.background]="getRoleColor(client.role)">
+            {{ getInitials(client.prenom, client.nom) }}
+          </div>
+          <div class="c-meta">
+            <div class="c-name">{{ client.prenom }} {{ client.nom }}</div>
+            <span class="c-role-pill"
+                  [class.crp-client]="client.role === 'CLIENT' || client.role === 'CLIENT_PUBLIC'"
+                  [class.crp-affiliate]="client.role === 'AFFILIATE'">
+              {{ getRoleText(client.role) }}
+            </span>
+          </div>
+        </div>
+
+        <!-- ② Contact -->
+        <div class="cc cc-contact">
+          <div class="c-email">
+            <i class="fas fa-envelope"></i> {{ client.email }}
+          </div>
+          <div class="c-phone">
+            <i class="fas fa-phone"></i>
+            {{ client.telephone || '—' }}
+          </div>
+        </div>
+
+        <!-- ③ Localisation -->
+        <div class="cc cc-location">
+          <ng-container *ngIf="client.zoneRecherchee">
+            <i class="fas fa-map-marker-alt c-loc-pin"></i>
+            <span>{{ client.zoneRecherchee }}</span>
+          </ng-container>
+          <span *ngIf="!client.zoneRecherchee" class="c-none">—</span>
+        </div>
+
+        <!-- ④ Budget (clients) / Ventes (affiliates) -->
+        <div class="cc cc-budget">
+          <ng-container *ngIf="client.role !== 'AFFILIATE'">
+            <ng-container *ngIf="client.budgetEstime">
+              <div class="c-budget-val">{{ formatCurrency(client.budgetEstime) }}</div>
+              <div class="c-budget-bar">
+                <div class="c-budget-fill" [style.width.%]="Math.min(client.budgetEstime / 1000000 * 100, 100)"></div>
+              </div>
+            </ng-container>
+            <span *ngIf="!client.budgetEstime" class="c-none">—</span>
+          </ng-container>
+          <ng-container *ngIf="client.role === 'AFFILIATE'">
+            <span class="txn-badge txn-sale" *ngIf="client.nombreVentesLiees && client.nombreVentesLiees > 0">
+              <i class="fas fa-handshake me-1"></i>{{ client.nombreVentesLiees }}
+            </span>
+            <span *ngIf="!client.nombreVentesLiees || client.nombreVentesLiees === 0" class="c-none">0</span>
+          </ng-container>
+        </div>
+
+        <!-- ⑤ Achats (clients) / Ranking (affiliates) -->
+        <div class="cc cc-achats">
+          <ng-container *ngIf="client.role !== 'AFFILIATE'">
+            <span class="txn-badge txn-sale" *ngIf="client.nombreAchats && client.nombreAchats > 0">{{ client.nombreAchats }}</span>
+            <span *ngIf="!client.nombreAchats || client.nombreAchats === 0" class="c-none">0</span>
+          </ng-container>
+          <ng-container *ngIf="client.role === 'AFFILIATE'">
+            <span class="ranking-tier-badge" [ngClass]="getRankingTier(client).cssClass">
+              {{ getRankingTier(client).emoji }} {{ getRankingTier(client).label }}
+            </span>
+          </ng-container>
+        </div>
+
+        <!-- ⑤b Locations (clients) / Zone (affiliates) -->
+        <div class="cc cc-locations">
+          <ng-container *ngIf="client.role !== 'AFFILIATE'">
+            <span class="txn-badge txn-rent" *ngIf="client.nombreLocations && client.nombreLocations > 0">{{ client.nombreLocations }}</span>
+            <span *ngIf="!client.nombreLocations || client.nombreLocations === 0" class="c-none">0</span>
+          </ng-container>
+          <ng-container *ngIf="client.role === 'AFFILIATE'">
+            <ng-container *ngIf="client.zoneRecherchee">
+              <i class="fas fa-map-marker-alt c-loc-pin"></i>
+              <span class="aff-zone-chip">{{ client.zoneRecherchee }}</span>
+            </ng-container>
+            <span *ngIf="!client.zoneRecherchee" class="c-none">—</span>
+          </ng-container>
+        </div>
+
+        <!-- ⑥ Statut -->
+        <div class="cc cc-status">
+          <span class="c-status-pill" [class.csp-active]="client.isActive" [class.csp-inactive]="!client.isActive">
+            <span class="csp-dot"></span>
+            {{ client.isActive ? 'Actif' : 'Inactif' }}
+          </span>
+        </div>
+
+        <!-- ⑦ Actions -->
+        <div class="cc cc-actions" (click)="$event.stopPropagation()">
+          <button class="ca-btn ca-view" (click)="openDetailsModal(client)" title="Voir">
+            <i class="fas fa-eye"></i>
+          </button>
+          <button class="ca-btn ca-edit" *ngIf="canEdit(client)" (click)="openEditModal(client)" title="Modifier">
+            <i class="fas fa-edit"></i>
+          </button>
+          <div class="ca-more-wrap">
+            <button class="ca-btn ca-more" (click)="toggleDropdown($event, 'dd-'+client.id)" title="Plus">
+              <i class="fas fa-ellipsis-v"></i>
+            </button>
+            <div class="ca-dropdown" [id]="'dd-'+client.id">
+              <button class="ca-dd-item" (click)="openNoteModal(client)">
+                <i class="fas fa-sticky-note"></i> Ajouter une note
+              </button>
+              <button class="ca-dd-item" (click)="openHistoryModal(client)">
+                <i class="fas fa-history"></i> Voir historique
+              </button>
+              <div class="ca-dd-sep"></div>
+              <button class="ca-dd-item" *ngIf="canEdit(client)" (click)="toggleClientStatus(client)">
+                <i class="fas" [class.fa-user-check]="!client.isActive" [class.fa-user-slash]="client.isActive"></i>
+                {{ client.isActive ? 'Désactiver' : 'Activer' }}
+              </button>
+              <button class="ca-dd-item ca-dd-green" *ngIf="client.role !== 'AFFILIATE' && canEdit(client)" (click)="openAssignPropertyModal(client)">
+                <i class="fas fa-home"></i> Assigner un bien
+              </button>
+              <button class="ca-dd-item" *ngIf="canViewAffiliateDetails(client)" (click)="viewAffiliateDetails(client)">
+                <i class="fas fa-chart-line"></i> Stats affiliation
+              </button>
+              <button class="ca-dd-item" *ngIf="canManageSharing(client)" (click)="openShareModal(client)">
+                <i class="fas fa-share-alt"></i> Gérer le partage
+              </button>
+              <div class="ca-dd-sep" *ngIf="currentUser?.role === 'SUPER_ADMIN'"></div>
+              <button class="ca-dd-item ca-dd-danger" *ngIf="currentUser?.role === 'SUPER_ADMIN'" (click)="deleteClient(client)">
+                <i class="fas fa-trash-alt"></i> Supprimer
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /crm-row -->
+
+      <!-- Pagination -->
+      <div class="crm-pagination" *ngIf="filteredClients.length > 0">
+        <span class="cpag-count">
+          {{ page * pageSize + 1 }}–{{ Math.min((page + 1) * pageSize, filteredClients.length) }}
+          sur {{ filteredClients.length }}
+        </span>
+        <div class="cpag-controls">
+          <div class="cpag-size">
+            <button [class.active]="pageSize===10" (click)="changePageSize(10)">10</button>
+            <button [class.active]="pageSize===25" (click)="changePageSize(25)">25</button>
+            <button [class.active]="pageSize===50" (click)="changePageSize(50)">50</button>
+          </div>
+          <button class="cpag-nav" (click)="changePage(page-1)" [disabled]="page===0">
+            <i class="fas fa-chevron-left"></i>
+          </button>
+          <span class="cpag-label">{{ page+1 }} / {{ Math.ceil(filteredClients.length/pageSize)||1 }}</span>
+          <button class="cpag-nav" (click)="changePage(page+1)" [disabled]="page >= Math.ceil(filteredClients.length/pageSize)-1">
+            <i class="fas fa-chevron-right"></i>
+          </button>
+        </div>
+      </div>
+
+    </ng-container>
+
+    <!-- ── Clients apportés par affiliés (CRM leads — aucun compte User) ───── -->
+    <ng-container *ngIf="activeTab === 'affiliate-customers'">
+
+      <div class="crm-loading" *ngIf="loadingAffiliateCustomers">
+        <div class="spinner-border text-primary" role="status"></div>
+        <p>Chargement…</p>
+      </div>
+
+      <ng-container *ngIf="!loadingAffiliateCustomers">
+        <div class="crm-empty" *ngIf="filteredAffiliateCustomers.length === 0">
+          <div class="crm-empty-icon"><i class="fas fa-user-friends"></i></div>
+          <p>Aucun client apporté par un affilié</p>
+          <small class="text-muted">Les clients apparaissent ici lorsqu'une offre affiliée est finalisée.</small>
+        </div>
+
+        <div class="crm-head crm-head-acust" *ngIf="filteredAffiliateCustomers.length > 0">
+          <div class="ch">Acheteur</div>
+          <div class="ch">Apporté par</div>
+          <div class="ch">Bien</div>
+          <div class="ch">Type</div>
+          <div class="ch">Montant</div>
+          <div class="ch">Commission</div>
+          <div class="ch">Statut</div>
+          <div class="ch">Date</div>
+        </div>
+
+        <div class="crm-row crm-row-acust"
+             *ngFor="let ac of filteredAffiliateCustomers | slice:(page*pageSize):((page+1)*pageSize)">
+          <div class="cc">
+            <div class="c-name">{{ ac.buyerName }}</div>
+            <div class="c-sub">
+              <span *ngIf="ac.buyerEmail"><i class="fas fa-envelope"></i> {{ ac.buyerEmail }}</span>
+              <span *ngIf="ac.buyerPhone" class="ms-2"><i class="fas fa-phone"></i> {{ ac.buyerPhone }}</span>
+            </div>
+          </div>
+          <div class="cc">
+            <span class="c-role-pill crp-affiliate">
+              <i class="fas fa-handshake"></i> {{ ac.affiliateName }}
+            </span>
+            <span class="acust-badge">Via affilié</span>
+          </div>
+          <div class="cc">{{ ac.propertyTitle || '—' }}</div>
+          <div class="cc">
+            <span class="txn-badge" [ngClass]="ac.transactionType === 'RENT' ? 'txn-rent' : 'txn-sale'">
+              {{ ac.transactionType === 'RENT' ? 'Location' : 'Vente' }}
+            </span>
+          </div>
+          <div class="cc c-amount">{{ formatCurrency(ac.propertyPrice || 0) }}</div>
+          <div class="cc c-amount">
+            {{ formatCurrency(ac.commissionAmount || 0) }}
+            <span class="acust-comm-sub" [class.is-paid]="ac.commissionPaid">
+              <i class="fas" [class.fa-check-circle]="ac.commissionPaid" [class.fa-clock]="!ac.commissionPaid"></i>
+              Commission {{ ac.commissionPaid ? 'payée' : 'en attente' }}
+            </span>
+          </div>
+          <div class="cc">
+            <span class="c-status-pill" [ngClass]="affiliateDealStatus(ac).cls">
+              <span class="csp-dot"></span>
+              {{ affiliateDealStatus(ac).label }}
+            </span>
+          </div>
+          <div class="cc c-date">{{ formatDate(ac.createdAt) }}</div>
+        </div>
+
+        <div class="crm-pagination" *ngIf="filteredAffiliateCustomers.length > pageSize">
+          <span class="cpag-count">
+            {{ page * pageSize + 1 }}–{{ Math.min((page + 1) * pageSize, filteredAffiliateCustomers.length) }}
+            sur {{ filteredAffiliateCustomers.length }}
+          </span>
+          <div class="cpag-controls">
+            <button class="cpag-nav" (click)="changePage(page-1)" [disabled]="page===0">
+              <i class="fas fa-chevron-left"></i>
+            </button>
+            <span class="cpag-label">{{ page+1 }} / {{ Math.ceil(filteredAffiliateCustomers.length/pageSize)||1 }}</span>
+            <button class="cpag-nav" (click)="changePage(page+1)"
+                    [disabled]="page >= Math.ceil(filteredAffiliateCustomers.length/pageSize)-1">
+              <i class="fas fa-chevron-right"></i>
+            </button>
+          </div>
+        </div>
+      </ng-container>
+
+    </ng-container>
+  </div><!-- /crm-panel -->
+
+</div><!-- /crm-page -->
+
+<!-- Modal Création Client -->
+<div class="modal fade" tabindex="-1" #createClientModal>
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h4 class="modal-title"><i class="fas fa-user-plus me-2"></i>Ajouter un client</h4>
+        <button type="button" class="btn-close" (click)="closeCreateModal()"></button>
+      </div>
+      <div class="modal-body">
+        <form [formGroup]="clientForm">
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Type de client *</label>
+              <select class="form-select" formControlName="clientType" (change)="onClientTypeChange()">
+                <option value="NORMAL">Client normal</option>
+                <option value="AFFILIATE">Client affilié</option>
+              </select>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Email *</label>
+              <input type="email" class="form-control" formControlName="email" 
+                     [class.is-invalid]="clientForm.get('email')?.invalid && clientForm.get('email')?.touched">
+              <div class="invalid-feedback">Email invalide</div>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Nom *</label>
+              <input type="text" class="form-control" formControlName="nom" 
+                     [class.is-invalid]="clientForm.get('nom')?.invalid && clientForm.get('nom')?.touched">
+              <div class="invalid-feedback">Nom requis</div>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Prénom *</label>
+              <input type="text" class="form-control" formControlName="prenom" 
+                     [class.is-invalid]="clientForm.get('prenom')?.invalid && clientForm.get('prenom')?.touched">
+              <div class="invalid-feedback">Prénom requis</div>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Téléphone</label>
+              <input type="tel" class="form-control" formControlName="telephone" 
+                     [class.is-invalid]="clientForm.get('telephone')?.invalid && clientForm.get('telephone')?.touched">
+              <div class="invalid-feedback">Format invalide (ex: 062547413)</div>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Mot de passe *</label>
+              <div class="input-group">
+                <input [type]="showPassword ? 'text' : 'password'" class="form-control" formControlName="password" 
+                       [class.is-invalid]="clientForm.get('password')?.invalid && clientForm.get('password')?.touched">
+                <button class="btn btn-outline-secondary" type="button" (click)="togglePasswordVisibility()">
+                  <i class="fas" [class.fa-eye]="!showPassword" [class.fa-eye-slash]="showPassword"></i>
+                </button>
+                <button class="btn btn-outline-secondary" type="button" (click)="generatePassword()">
+                  <i class="fas fa-sync-alt"></i>
+                </button>
+              </div>
+              <div class="invalid-feedback">Minimum 6 caractères</div>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Confirmer mot de passe *</label>
+              <input [type]="showPassword ? 'text' : 'password'" class="form-control" formControlName="confirmPassword" 
+                     [class.is-invalid]="clientForm.hasError('passwordMismatch') && clientForm.get('confirmPassword')?.touched">
+              <div class="invalid-feedback">Les mots de passe ne correspondent pas</div>
+            </div>
+            <div class="col-md-6 mb-3" *ngIf="!isAffiliateForm">
+              <label class="form-label">Budget estimé (TND)</label>
+              <input type="number" class="form-control" formControlName="budgetEstime" placeholder="Ex: 500000">
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Pays<span *ngIf="isAffiliateForm"> *</span></label>
+              <select class="form-select" formControlName="country" (change)="onCountryChange()"
+                      [class.is-invalid]="clientForm.get('country')?.invalid && clientForm.get('country')?.touched">
+                <option value="">Sélectionner un pays</option>
+                <option *ngFor="let c of availableCountries" [value]="c">{{ c }}</option>
+              </select>
+              <div class="invalid-feedback">Pays requis</div>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Ville<span *ngIf="isAffiliateForm"> *</span></label>
+              <select class="form-select" formControlName="city"
+                      [class.is-invalid]="clientForm.get('city')?.invalid && clientForm.get('city')?.touched"
+                      [attr.disabled]="clientForm.get('country')?.value ? null : true">
+                <option value="">Sélectionner une ville</option>
+                <option *ngFor="let v of availableCities" [value]="v">{{ v }}</option>
+              </select>
+              <small class="text-muted" *ngIf="!clientForm.get('country')?.value">Choisissez d'abord un pays.</small>
+              <div class="invalid-feedback">Ville requise</div>
+            </div>
+            
+            <!-- ========== VISIBILITÉ ========== -->
+            <div class="col-12 mb-3" *ngIf="!isAffiliateForm">
+              <label class="form-label">Type de visibilité *</label>
+              <div class="visibility-options">
+                <div class="form-check form-check-inline">
+                  <input class="form-check-input" type="radio" formControlName="visibilityType" value="AGENCY_CLIENT" id="visibilityAgency">
+                  <label class="form-check-label" for="visibilityAgency">
+                    <i class="fas fa-building me-1"></i> Client agence
+                    <small class="d-block text-muted">Visible uniquement par votre agence</small>
+                  </label>
+                </div>
+                <div class="form-check form-check-inline" *ngIf="currentUser?.role === 'SUPER_ADMIN'">
+                  <input class="form-check-input" type="radio" formControlName="visibilityType" value="PRIVATE_CLIENT" id="visibilityPrivate">
+                  <label class="form-check-label" for="visibilityPrivate">
+                    <i class="fas fa-lock me-1"></i> Client privé
+                    <small class="d-block text-muted">Visible uniquement par vous et les agences sélectionnées</small>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <!-- Pour PRIVATE_CLIENT - Agences autorisées uniquement (SUPER_ADMIN seulement) -->
+            <div class="col-12 mb-3" *ngIf="!isAffiliateForm && clientForm.get('visibilityType')?.value === 'PRIVATE_CLIENT' && currentUser?.role === 'SUPER_ADMIN'">
+              <label class="form-label">
+                <i class="fas fa-shield-alt me-1 text-primary"></i>
+                Agences autorisées à voir ce client
+              </label>
+              <p class="text-muted small mb-2">
+                Sélectionnez les agences qui pourront accéder au profil de ce client privé.
+                Si aucune agence n'est sélectionnée, seul vous (Super Admin) aurez accès.
+              </p>
+              <div class="agency-selector-list">
+                <div *ngIf="agencies.length === 0" class="text-muted text-center py-3">
+                  <i class="fas fa-info-circle me-1"></i> Aucune agence disponible.
+                </div>
+                <div *ngFor="let agency of agencies"
+                     class="agency-selector-card"
+                     [class.agency-selector-card--selected]="isAgencySelected(agency.id)"
+                     (click)="toggleSharedAgencyById(agency.id)">
+                  <div class="asc-check">
+                    <i class="fas" [class.fa-check-square]="isAgencySelected(agency.id)" [class.fa-square]="!isAgencySelected(agency.id)"></i>
+                  </div>
+                  <div class="asc-icon"><i class="fas fa-building"></i></div>
+                  <div class="asc-info">
+                    <div class="asc-name">{{ agency.prenom }} {{ agency.nom }}</div>
+                    <div class="asc-email">{{ agency.email }}</div>
+                  </div>
+                </div>
+              </div>
+              <small class="text-muted mt-1 d-block">
+                <i class="fas fa-lock me-1"></i>
+                {{ selectedSharedAgencyIds.length }} agence{{ selectedSharedAgencyIds.length !== 1 ? 's' : '' }} sélectionnée{{ selectedSharedAgencyIds.length !== 1 ? 's' : '' }}
+              </small>
+            </div>
+            
+            <!-- Affiliate fields -->
+            <div class="col-12" *ngIf="isAffiliateForm">
+              <div class="affiliate-fields border-top pt-3">
+                <h6 class="mb-3"><i class="fas fa-handshake me-2"></i>Informations d'affiliation</h6>
+                <div class="row">
+                  <div class="col-md-6 mb-3">
+                    <label class="form-label">Code d'affiliation</label>
+                    <input type="text" class="form-control" formControlName="codeAffiliation" readonly>
+                    <small class="text-muted">Code généré automatiquement</small>
+                  </div>
+                  <div class="col-md-12 mb-3">
+                    <label class="form-label">Source / Canal d'acquisition</label>
+                    <input type="text" class="form-control" formControlName="source" placeholder="Ex: Réseau social, Parrainage, Site web...">
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" (click)="closeCreateModal()">Annuler</button>
+        <button type="button" class="btn btn-primary" (click)="createClient()" [disabled]="clientForm.invalid || loading">
+          <i class="fas fa-save me-2"></i>Créer le client
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Édition Client -->
+<div class="modal fade" tabindex="-1" #editClientModal>
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h4 class="modal-title"><i class="fas fa-edit me-2"></i>Modifier client</h4>
+        <button type="button" class="btn-close" (click)="closeEditModal()"></button>
+      </div>
+      <div class="modal-body">
+        <form [formGroup]="editForm">
+          <div class="row">
+            <!-- ─── Common fields (both normal client and affiliate) ─── -->
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Nom *</label>
+              <input type="text" class="form-control" formControlName="nom"
+                     [class.is-invalid]="editForm.get('nom')?.invalid && editForm.get('nom')?.touched">
+              <div class="invalid-feedback">Nom requis</div>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Prénom *</label>
+              <input type="text" class="form-control" formControlName="prenom"
+                     [class.is-invalid]="editForm.get('prenom')?.invalid && editForm.get('prenom')?.touched">
+              <div class="invalid-feedback">Prénom requis</div>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Email</label>
+              <input type="email" class="form-control" [value]="selectedClient?.email" readonly>
+              <small class="text-muted">L'email ne peut pas être modifié.</small>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Téléphone</label>
+              <input type="tel" class="form-control" formControlName="telephone"
+                     [class.is-invalid]="editForm.get('telephone')?.invalid && editForm.get('telephone')?.touched">
+              <div class="invalid-feedback">Format invalide (ex: 062547413)</div>
+            </div>
+
+            <!-- ─── Normal-client fields (hidden for affiliates) ─── -->
+            <ng-container *ngIf="selectedClient && selectedClient.role !== 'AFFILIATE'">
+              <div class="col-md-6 mb-3">
+                <label class="form-label">Budget estimé (TND)</label>
+                <input type="number" class="form-control" formControlName="budgetEstime" placeholder="Ex: 250000" min="0">
+              </div>
+              <div class="col-md-6 mb-3">
+                <label class="form-label">Pays</label>
+                <select class="form-select" formControlName="country" (change)="onEditCountryChange()">
+                  <option value="">-- Sélectionnez un pays --</option>
+                  <option *ngFor="let c of editCountries" [value]="c">{{ c }}</option>
+                </select>
+              </div>
+              <div class="col-md-6 mb-3 offset-md-6">
+                <label class="form-label">Ville</label>
+                <select class="form-select" formControlName="city" [disabled]="!editForm.get('country')?.value">
+                  <option value="">-- Sélectionnez une ville --</option>
+                  <option *ngFor="let v of editCities" [value]="v">{{ v }}</option>
+                </select>
+                <small class="text-muted" *ngIf="!editForm.get('country')?.value">Choisissez d'abord un pays.</small>
+              </div>
+            </ng-container>
+
+            <!-- ─── Affiliate-specific zone selection (mirrors Ajouter Affilié) ─── -->
+            <ng-container *ngIf="selectedClient?.role === 'AFFILIATE'">
+              <div class="col-12 mb-2">
+                <div class="affiliate-fields border-top pt-3">
+                  <h6 class="mb-3"><i class="fas fa-handshake me-2"></i>Zone d'affiliation</h6>
+                </div>
+              </div>
+              <div class="col-md-6 mb-3">
+                <label class="form-label">Pays *</label>
+                <select class="form-select" formControlName="country" (change)="onEditCountryChange()"
+                        [class.is-invalid]="editForm.get('country')?.invalid && editForm.get('country')?.touched">
+                  <option value="">-- Sélectionnez un pays --</option>
+                  <option *ngFor="let c of editCountries" [value]="c">{{ c }}</option>
+                </select>
+                <div class="invalid-feedback">Pays requis</div>
+              </div>
+              <div class="col-md-6 mb-3">
+                <label class="form-label">Ville *</label>
+                <select class="form-select" formControlName="city"
+                        [class.is-invalid]="editForm.get('city')?.invalid && editForm.get('city')?.touched"
+                        [disabled]="!editForm.get('country')?.value">
+                  <option value="">-- Sélectionnez une ville --</option>
+                  <option *ngFor="let v of editCities" [value]="v">{{ v }}</option>
+                </select>
+                <small class="text-muted" *ngIf="!editForm.get('country')?.value">Choisissez d'abord un pays.</small>
+                <div class="invalid-feedback">Ville requise</div>
+              </div>
+            </ng-container>
+
+            <div class="col-md-6 mb-3">
+              <div class="form-check form-switch mt-4">
+                <input class="form-check-input" type="checkbox" formControlName="isActive" id="isActiveSwitch">
+                <label class="form-check-label" for="isActiveSwitch">Compte actif</label>
+              </div>
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" (click)="closeEditModal()">Annuler</button>
+        <button type="button" class="btn btn-primary" (click)="updateClient()" [disabled]="editForm.invalid || loading">
+          <i class="fas fa-save me-2"></i>Enregistrer
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Détails Client - Version corrigée -->
+<div class="modal fade" tabindex="-1" #detailsModal>
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h4 class="modal-title"><i class="fas fa-user-circle me-2"></i>{{ selectedClient?.prenom }} {{ selectedClient?.nom }}</h4>
+        <button type="button" class="btn-close" (click)="closeDetailsModal()"></button>
+      </div>
+      <div class="modal-body" *ngIf="selectedClient">
+        <div class="text-center mb-4">
+          <div class="user-avatar-large mx-auto mb-3" [style.background-color]="getRoleColor(selectedClient.role)">
+            {{ getInitials(selectedClient.prenom, selectedClient.nom) }}
+          </div>
+          <h5 class="mb-1">{{ selectedClient.prenom }} {{ selectedClient.nom }}</h5>
+          <span class="badge me-1" [ngClass]="getClientTypeBadgeClass(selectedClient.role)">{{ getRoleText(selectedClient.role) }}</span>
+          <span class="badge me-1" [ngClass]="getVisibilityTypeClass(selectedClient.visibilityType)">
+            <i [class]="'fas ' + getVisibilityTypeIcon(selectedClient.visibilityType)" class="me-1"></i>
+            {{ getVisibilityTypeLabel(selectedClient.visibilityType) }}
+          </span>
+          <span class="badge" [ngClass]="selectedClient.isActive ? 'bg-success' : 'bg-danger'">
+            {{ selectedClient.isActive ? 'Actif' : 'Inactif' }}
+          </span>
+        </div>
+
+        <div class="detail-section">
+          <h6><i class="fas fa-address-card me-2"></i>Informations de contact</h6>
+          <div class="detail-row"><div class="detail-label">Email :</div><div class="detail-value">{{ selectedClient.email }}</div></div>
+          <div class="detail-row"><div class="detail-label">Téléphone :</div><div class="detail-value">{{ selectedClient.telephone || 'Non renseigné' }}</div></div>
+          <div class="detail-row"><div class="detail-label">Date d'inscription :</div><div class="detail-value">{{ formatDate(selectedClient.createdAt) }}</div></div>
+          <div class="detail-row"><div class="detail-label">Créé par :</div><div class="detail-value">{{ selectedClient.createdByName || 'Système' }}</div></div>
+        </div>
+
+        <div class="detail-section" *ngIf="selectedClient.role !== 'AFFILIATE'">
+          <h6><i class="fas fa-chart-line me-2"></i>Informations commerciales</h6>
+          <div class="detail-row"><div class="detail-label">Budget estimé :</div><div class="detail-value">{{ formatCurrency(selectedClient.budgetEstime || 0) }}</div></div>
+          <div class="detail-row"><div class="detail-label">Zone recherchée :</div><div class="detail-value">{{ selectedClient.zoneRecherchee || 'Non définie' }}</div></div>
+        </div>
+
+        <!-- ✅ SECTION CORRIGÉE - Partagé avec -->
+        <div class="detail-section" *ngIf="selectedClient && selectedClient.visibilityType === 'PRIVATE_CLIENT' && selectedClient.sharedWithAgencyIds && selectedClient.sharedWithAgencyIds.length > 0">
+          <h6><i class="fas fa-share-alt me-2"></i>Partagé avec</h6>
+          <div class="d-flex flex-wrap gap-2">
+            <span *ngFor="let agencyId of selectedClient.sharedWithAgencyIds" class="badge bg-info">
+              <i class="fas fa-building me-1"></i> Agence ID: {{ agencyId }}
+            </span>
+          </div>
+        </div>
+
+        <!-- ── Normal client: Biens achetés / loués ────────────────────────── -->
+        <ng-container *ngIf="selectedClient.role !== 'AFFILIATE'">
+          <div class="txn-section">
+            <!-- KPI strip -->
+            <div class="txn-kpi-strip">
+              <div class="txn-kpi">
+                <span class="txn-kpi-val txn-kpi-blue">{{ selectedClient.nombreAchats || 0 }}</span>
+                <span class="txn-kpi-lbl">Achat{{ (selectedClient.nombreAchats || 0) > 1 ? 's' : '' }}</span>
+              </div>
+              <div class="txn-kpi-sep"></div>
+              <div class="txn-kpi">
+                <span class="txn-kpi-val txn-kpi-violet">{{ selectedClient.nombreLocations || 0 }}</span>
+                <span class="txn-kpi-lbl">Location{{ (selectedClient.nombreLocations || 0) > 1 ? 's' : '' }}</span>
+              </div>
+              <div class="txn-kpi-sep"></div>
+              <div class="txn-kpi">
+                <span class="txn-kpi-val txn-kpi-green">{{ fmtAmount(selectedClient.totalAchats) }}</span>
+                <span class="txn-kpi-lbl">Volume total</span>
+              </div>
+            </div>
+            <!-- Tab selector -->
+            <div class="txn-tabs">
+              <button class="txn-tab" [class.txn-tab-active]="detailActiveTab === 'sales'" (click)="detailActiveTab = 'sales'">
+                <i class="fas fa-key me-1"></i> Biens achetés
+                <span class="txn-tab-badge txn-tab-badge-blue" *ngIf="(selectedClient.nombreAchats || 0) > 0">{{ selectedClient.nombreAchats }}</span>
+              </button>
+              <button class="txn-tab" [class.txn-tab-active]="detailActiveTab === 'rentals'" (click)="detailActiveTab = 'rentals'">
+                <i class="fas fa-file-contract me-1"></i> Biens loués
+                <span class="txn-tab-badge txn-tab-badge-violet" *ngIf="(selectedClient.nombreLocations || 0) > 0">{{ selectedClient.nombreLocations }}</span>
+              </button>
+            </div>
+            <!-- Loading skeleton -->
+            <div *ngIf="loadingPurchases" class="txn-skeleton">
+              <div class="txn-skel-card" *ngFor="let i of [1,2]">
+                <div class="txn-skel-thumb"></div>
+                <div class="txn-skel-body">
+                  <div class="txn-skel-line txn-skel-title"></div>
+                  <div class="txn-skel-line txn-skel-sub"></div>
+                  <div class="txn-skel-line txn-skel-price"></div>
+                </div>
+              </div>
+            </div>
+            <!-- Tab: Biens achetés -->
+            <ng-container *ngIf="!loadingPurchases && detailActiveTab === 'sales'">
+              <div *ngIf="clientSales.length === 0" class="txn-empty">
+                <div class="txn-empty-icon">🏠</div><p>Aucun bien acheté enregistré</p>
+              </div>
+              <div class="txn-list" *ngIf="clientSales.length > 0">
+                <div class="txn-card" *ngFor="let p of clientSales">
+                  <div class="txn-card-thumb">
+                    <img *ngIf="purchaseImageUrl(p)" [src]="purchaseImageUrl(p)" alt="" />
+                    <div class="txn-card-no-img" *ngIf="!purchaseImageUrl(p)"><i class="fas fa-home"></i></div>
+                    <span class="txn-card-badge txn-card-badge-sale">Vendu</span>
+                  </div>
+                  <div class="txn-card-body">
+                    <div class="txn-card-title">{{ p.titre }}</div>
+                    <div class="txn-card-loc"><i class="fas fa-map-marker-alt"></i> {{ p.city }}{{ p.country ? ', ' + p.country : '' }}</div>
+                    <div class="txn-card-row">
+                      <span class="txn-card-price">{{ fmtAmount(p.prixVente) }}</span>
+                      <span class="txn-card-date">{{ fmtDate(p.updatedAt) }}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </ng-container>
+            <!-- Tab: Biens loués -->
+            <ng-container *ngIf="!loadingPurchases && detailActiveTab === 'rentals'">
+              <div *ngIf="clientRentals.length === 0" class="txn-empty">
+                <div class="txn-empty-icon">📋</div><p>Aucun bien loué enregistré</p>
+              </div>
+              <div class="txn-list" *ngIf="clientRentals.length > 0">
+                <div class="txn-card" *ngFor="let p of clientRentals">
+                  <div class="txn-card-thumb">
+                    <img *ngIf="purchaseImageUrl(p)" [src]="purchaseImageUrl(p)" alt="" />
+                    <div class="txn-card-no-img" *ngIf="!purchaseImageUrl(p)"><i class="fas fa-building"></i></div>
+                    <span class="txn-card-badge txn-card-badge-rent">Loué</span>
+                  </div>
+                  <div class="txn-card-body">
+                    <div class="txn-card-title">{{ p.titre }}</div>
+                    <div class="txn-card-loc"><i class="fas fa-map-marker-alt"></i> {{ p.city }}{{ p.country ? ', ' + p.country : '' }}</div>
+                    <div class="txn-card-row">
+                      <span class="txn-card-price">{{ fmtAmount(p.prixLocation) }}<span class="txn-card-freq">/mois</span></span>
+                    </div>
+                    <div class="txn-rental-meta">
+                      <div class="txn-rental-item" *ngIf="p.rentalStartDate">
+                        <span class="txn-rental-lbl">Début</span><span class="txn-rental-val">{{ fmtDate(p.rentalStartDate) }}</span>
+                      </div>
+                      <div class="txn-rental-item" *ngIf="p.rentalEndDate">
+                        <span class="txn-rental-lbl">Fin</span><span class="txn-rental-val">{{ fmtDate(p.rentalEndDate) }}</span>
+                      </div>
+                      <div class="txn-rental-item" *ngIf="p.rentalDurationMonths">
+                        <span class="txn-rental-lbl">Durée</span><span class="txn-rental-val">{{ p.rentalDurationMonths }} mois</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </ng-container>
+          </div>
+        </ng-container>
+
+        <!-- ── Affiliate: 3-section professional dashboard ───────────────── -->
+        <ng-container *ngIf="selectedClient.role === 'AFFILIATE'">
+
+          <!-- § 1 – Statistiques KPIs -->
+          <div class="aff-detail-section">
+            <div class="aff-detail-header">
+              <i class="fas fa-chart-bar me-2"></i>Statistiques de performance
+            </div>
+            <div class="aff-loading" *ngIf="loadingAffiliateDetail">
+              <div class="spinner-border spinner-border-sm text-primary me-2"></div> Chargement…
+            </div>
+            <ng-container *ngIf="!loadingAffiliateDetail">
+              <div class="aff-kpi-grid">
+                <div class="aff-kpi-card aff-kpi-blue">
+                  <div class="aff-kpi-val">{{ affiliateStats?.totalSales || 0 }}</div>
+                  <div class="aff-kpi-lbl">Ventes totales</div>
+                </div>
+                <div class="aff-kpi-card aff-kpi-green">
+                  <div class="aff-kpi-val">{{ fmtAmount(affiliateStats?.totalRevenue) }}</div>
+                  <div class="aff-kpi-lbl">Chiffre d'affaires</div>
+                </div>
+                <div class="aff-kpi-card aff-kpi-amber">
+                  <div class="aff-kpi-val">{{ fmtAmount(affiliateStats?.pendingCommission) }}</div>
+                  <div class="aff-kpi-lbl">Commissions en attente</div>
+                </div>
+                <div class="aff-kpi-card aff-kpi-purple">
+                  <div class="aff-kpi-val">{{ fmtAmount(affiliateStats?.paidCommission) }}</div>
+                  <div class="aff-kpi-lbl">Commissions payées</div>
+                </div>
+                <div class="aff-kpi-card aff-kpi-teal">
+                  <div class="aff-kpi-val">{{ affiliateStats?.totalOffersAccepted || 0 }}</div>
+                  <div class="aff-kpi-lbl">Offres acceptées</div>
+                </div>
+                <div class="aff-kpi-card aff-kpi-gray">
+                  <div class="aff-kpi-val">{{ (affiliateStats?.conversionRate || 0).toFixed(1) }}%</div>
+                  <div class="aff-kpi-lbl">Taux de conversion</div>
+                </div>
+              </div>
+              <!-- Ranking + zone strip -->
+              <div class="aff-rank-strip">
+                <span class="ranking-tier-badge" [ngClass]="getRankingTierFromStats().cssClass">
+                  {{ getRankingTierFromStats().emoji }} {{ getRankingTierFromStats().label }}
+                </span>
+                <span class="aff-rank-label" *ngIf="affiliateStats?.rank">
+                  Rang #{{ affiliateStats?.rank }}
+                </span>
+                <span class="aff-rank-label" *ngIf="affiliateStats?.monthlyRewardAmount">
+                  · Bonus mensuel +{{ affiliateStats?.monthlyRewardAmount }}%
+                </span>
+                <span class="aff-zone-chip ms-auto" *ngIf="selectedClient.zoneRecherchee">
+                  <i class="fas fa-map-marker-alt me-1"></i>{{ selectedClient.zoneRecherchee }}
+                </span>
+              </div>
+              <!-- Account meta -->
+              <div class="aff-meta-row">
+                <span *ngIf="selectedClient.codeAffiliation">Code : <strong>{{ selectedClient.codeAffiliation }}</strong></span>
+                <span *ngIf="selectedClient.source">Source : <strong>{{ selectedClient.source }}</strong></span>
+              </div>
+            </ng-container>
+          </div>
+
+          <!-- § 2 – Biens vendus -->
+          <div class="aff-detail-section">
+            <div class="aff-detail-header">
+              <i class="fas fa-home me-2"></i>Biens vendus
+              <span class="aff-detail-count" *ngIf="!loadingAffiliateDetail">{{ getAffiliateSaleTransactions().length }}</span>
+            </div>
+            <div class="aff-loading" *ngIf="loadingAffiliateDetail">
+              <div class="spinner-border spinner-border-sm text-primary me-2"></div> Chargement…
+            </div>
+            <ng-container *ngIf="!loadingAffiliateDetail">
+              <div *ngIf="getAffiliateSaleTransactions().length === 0" class="txn-empty">
+                <div class="txn-empty-icon">🏠</div>
+                <p>Aucune vente enregistrée</p>
+              </div>
+              <div class="txn-list" *ngIf="getAffiliateSaleTransactions().length > 0">
+                <div class="txn-card" *ngFor="let t of getAffiliateSaleTransactions()">
+                  <div class="txn-card-no-img"><i class="fas fa-home"></i></div>
+                  <div class="txn-card-body">
+                    <div class="txn-card-title">{{ t.propertyTitle }}</div>
+                    <div class="txn-card-row">
+                      <span class="txn-card-price">{{ fmtAmount(t.propertyPrice) }}</span>
+                      <span class="aff-commission-badge">{{ fmtAmount(t.commissionAmount) }} commission</span>
+                    </div>
+                    <div class="txn-card-row" style="margin-top:4px">
+                      <span class="txn-card-date">{{ fmtDate(t.transactionDate) }}</span>
+                      <span class="aff-paid-badge" [class.paid]="t.isPaid">{{ t.isPaid ? '✓ Payée' : '⏳ En attente' }}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </ng-container>
+          </div>
+
+          <!-- § 3 – Historique complet des transactions -->
+          <div class="aff-detail-section">
+            <div class="aff-detail-header">
+              <i class="fas fa-list me-2"></i>Historique des transactions
+              <span class="aff-detail-count" *ngIf="!loadingAffiliateDetail">{{ affiliateTransactions.length }}</span>
+            </div>
+            <div class="aff-loading" *ngIf="loadingAffiliateDetail">
+              <div class="spinner-border spinner-border-sm text-primary me-2"></div> Chargement…
+            </div>
+            <ng-container *ngIf="!loadingAffiliateDetail">
+              <div *ngIf="affiliateTransactions.length === 0" class="txn-empty">
+                <div class="txn-empty-icon">📋</div>
+                <p>Aucune transaction enregistrée</p>
+              </div>
+              <div class="aff-txn-table" *ngIf="affiliateTransactions.length > 0">
+                <div class="aff-txn-row aff-txn-head">
+                  <span>Bien</span>
+                  <span>Prix</span>
+                  <span>Commission</span>
+                  <span>Date</span>
+                  <span>Statut</span>
+                </div>
+                <div class="aff-txn-row" *ngFor="let t of affiliateTransactions">
+                  <span class="aff-txn-title">{{ t.propertyTitle }}</span>
+                  <span>{{ fmtAmount(t.propertyPrice) }}</span>
+                  <span class="aff-commission-badge">{{ fmtAmount(t.commissionAmount) }}</span>
+                  <span class="txn-card-date">{{ fmtDate(t.transactionDate) }}</span>
+                  <span class="aff-paid-badge" [class.paid]="t.isPaid">{{ t.isPaid ? '✓ Payée' : '⏳' }}</span>
+                </div>
+              </div>
+            </ng-container>
+          </div>
+
+        </ng-container>
+
+        <div class="detail-section" *ngIf="selectedClient.derniereNote">
+          <h6><i class="fas fa-sticky-note me-2"></i>Dernière note</h6>
+          <div class="note-item p-3 bg-light rounded">{{ selectedClient.derniereNote }}</div>
+          <div class="small text-muted mt-2">{{ formatDate(selectedClient.derniereNoteDate || '') }}</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" (click)="closeDetailsModal()">Fermer</button>
+        <button type="button" class="btn btn-primary" *ngIf="canEdit(selectedClient!)" (click)="closeDetailsModal(); openEditModal(selectedClient!)">
+          <i class="fas fa-edit me-2"></i>Modifier
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Gestion Partage (PRIVATE_CLIENT) -->
+<div class="modal fade" tabindex="-1" #shareModal>
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h4 class="modal-title"><i class="fas fa-share-alt me-2"></i>Gérer le partage - {{ selectedClient?.prenom }} {{ selectedClient?.nom }}</h4>
+        <button type="button" class="btn-close" (click)="closeShareModal()"></button>
+      </div>
+      <div class="modal-body">
+        <p class="text-muted mb-3">Ce client est privé. Partagez-le avec des agences pour leur donner accès.</p>
+        
+        <div class="mb-3">
+          <label class="form-label">Agences disponibles</label>
+          <div class="available-agencies border rounded p-3" style="max-height: 300px; overflow-y: auto;">
+            <div *ngIf="availableAgencies.length === 0" class="text-center text-muted py-3">
+              <i class="fas fa-check-circle me-2"></i>Toutes les agences ont déjà accès
+            </div>
+            <div *ngFor="let agency of availableAgencies" class="d-flex justify-content-between align-items-center mb-2 p-2 border-bottom">
+              <div>
+                <strong>{{ agency.prenom }} {{ agency.nom }}</strong>
+                <div class="small text-muted">{{ agency.email }}</div>
+              </div>
+              <button class="btn btn-sm btn-primary" (click)="shareWithAgency(agency.id)">
+                <i class="fas fa-share me-1"></i> Partager
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ✅ SECTION CORRIGÉE - Agences avec accès -->
+        <div class="mb-3" *ngIf="selectedClient && selectedClient.sharedWithAgencyIds && selectedClient.sharedWithAgencyIds.length > 0">
+          <label class="form-label">Agences avec accès</label>
+          <div class="shared-agencies border rounded p-3">
+            <div *ngFor="let agencyId of selectedClient.sharedWithAgencyIds" class="d-flex justify-content-between align-items-center mb-2 p-2 border-bottom">
+              <div>
+                <i class="fas fa-building me-2 text-primary"></i>
+                <strong>Agence ID: {{ agencyId }}</strong>
+              </div>
+              <button class="btn btn-sm btn-danger" (click)="revokeSharing(agencyId)">
+                <i class="fas fa-trash me-1"></i> Révoquer
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" (click)="closeShareModal()">Fermer</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Ajout Note -->
+<div class="modal fade" tabindex="-1" #noteModal>
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h4 class="modal-title"><i class="fas fa-sticky-note me-2"></i>Ajouter une note - {{ selectedClient?.prenom }} {{ selectedClient?.nom }}</h4>
+        <button type="button" class="btn-close" (click)="closeNoteModal()"></button>
+      </div>
+      <div class="modal-body">
+        <form [formGroup]="noteForm">
+          <div class="mb-3">
+            <label class="form-label">Note *</label>
+            <textarea class="form-control" rows="5" formControlName="note" 
+                      placeholder="Saisissez votre note commerciale..."
+                      [class.is-invalid]="noteForm.get('note')?.invalid && noteForm.get('note')?.touched"></textarea>
+            <div class="invalid-feedback">Minimum 10 caractères requis</div>
+            <small class="text-muted mt-2 d-block">
+              <i class="fas fa-info-circle me-1"></i>
+              Cette note sera visible par tous les utilisateurs de votre agence.
+            </small>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" (click)="closeNoteModal()">Annuler</button>
+        <button type="button" class="btn btn-primary" (click)="addNote()" [disabled]="noteForm.invalid || loading">
+          <i class="fas fa-save me-2"></i>Ajouter la note
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Assigner un bien -->
+<div class="modal fade" tabindex="-1" #assignPropertyModal>
+  <div class="modal-dialog modal-xl">
+    <div class="modal-content">
+      <div class="modal-header" style="background: linear-gradient(135deg,#198754,#20c997); color:#fff;">
+        <h4 class="modal-title">
+          <i class="fas fa-home me-2"></i>
+          Assigner un bien — {{ assignPropClient?.prenom }} {{ assignPropClient?.nom }}
+        </h4>
+        <button type="button" class="btn-close btn-close-white" (click)="closeAssignPropertyModal()"></button>
+      </div>
+      <div class="modal-body">
+
+        <!-- Error -->
+        <div *ngIf="assignPropError" class="alert alert-danger py-2">
+          <i class="fas fa-exclamation-circle me-2"></i>{{ assignPropError }}
+        </div>
+
+        <!-- Loading spinner -->
+        <div *ngIf="assignPropLoading && assignPropList.length === 0" class="text-center py-4">
+          <div class="spinner-border text-success" role="status"></div>
+          <p class="mt-2 text-muted">Chargement des biens disponibles…</p>
+        </div>
+
+        <ng-container *ngIf="!assignPropLoading || assignPropList.length > 0">
+          <!-- Step 1: pick a property -->
+          <div *ngIf="!assignPropSelected">
+            <div class="input-group mb-3">
+              <span class="input-group-text"><i class="fas fa-search"></i></span>
+              <input type="text" class="form-control" [(ngModel)]="assignPropSearch"
+                     placeholder="Filtrer par titre, ville, type…">
+            </div>
+            <div *ngIf="assignPropFiltered.length === 0" class="text-center py-5 text-muted">
+              <i class="fas fa-home fa-3x mb-3"></i>
+              <p>Aucun bien disponible.</p>
+            </div>
+            <div class="assign-prop-list" *ngIf="assignPropFiltered.length > 0">
+              <div class="ap-card"
+                   *ngFor="let p of assignPropFiltered | slice:0:20"
+                   (click)="selectAssignProp(p)">
+
+                <!-- Thumbnail -->
+                <div class="ap-thumb">
+                  <img *ngIf="assignImageUrl(p) as imgSrc"
+                       [src]="imgSrc"
+                       [alt]="p.titre"
+                       (error)="$any($event.target).style.display='none'; $any($event.target).nextElementSibling.style.display='flex'">
+                  <div class="ap-thumb-fallback"
+                       [style.display]="assignImageUrl(p) ? 'none' : 'flex'">
+                    <i class="fas fa-home"></i>
+                  </div>
+                </div>
+
+                <!-- Info -->
+                <div class="ap-info">
+                  <div class="ap-title">{{ p.titre }}</div>
+                  <div class="ap-sub">
+                    <span class="ap-type-pill">{{ p.type }}</span>
+                    <i class="fas fa-map-marker-alt"></i>
+                    {{ p.city || '—' }}{{ p.country ? ', ' + p.country : '' }}
+                  </div>
+                </div>
+
+                <!-- Price + badge -->
+                <div class="ap-right">
+                  <div *ngIf="p.prixVente && p.prixVente > 0" class="ap-price ap-price-sale">
+                    {{ p.prixVente | number:'1.0-0' }} TND
+                  </div>
+                  <div *ngIf="p.prixLocation && p.prixLocation > 0" class="ap-price ap-price-rent">
+                    {{ p.prixLocation | number:'1.0-0' }} TND<small>/mois</small>
+                  </div>
+                  <span class="ap-badge">DISPONIBLE</span>
+                </div>
+
+              </div>
+            </div>
+          </div>
+
+          <!-- Step 2: configure sale type + rental contract -->
+          <div *ngIf="assignPropSelected">
+            <div class="alert alert-light border d-flex justify-content-between align-items-center mb-4">
+              <div>
+                <strong>{{ assignPropSelected.titre }}</strong>
+                <span class="text-muted ms-2">· {{ assignPropSelected.type }} · {{ assignPropSelected.city }}</span>
+              </div>
+              <button class="btn btn-sm btn-outline-secondary" (click)="assignPropSelected = null">
+                <i class="fas fa-times me-1"></i> Changer
+              </button>
+            </div>
+
+            <!-- Transaction type -->
+            <div class="mb-4">
+              <label class="form-label fw-semibold">Type de transaction *</label>
+              <div class="d-flex gap-3">
+                <div class="form-check"
+                     *ngIf="assignPropSelected.prixVente && assignPropSelected.prixVente > 0">
+                  <input class="form-check-input" type="radio" name="assignStatus" id="assignVente"
+                         [(ngModel)]="assignPropStatus" value="VENDU">
+                  <label class="form-check-label" for="assignVente">
+                    <i class="fas fa-gavel me-1 text-danger"></i> Vente ({{ assignPropSelected.prixVente | number:'1.0-0' }} TND)
+                  </label>
+                </div>
+                <div class="form-check"
+                     *ngIf="assignPropSelected.prixLocation && assignPropSelected.prixLocation > 0">
+                  <input class="form-check-input" type="radio" name="assignStatus" id="assignLoue"
+                         [(ngModel)]="assignPropStatus" value="LOUE">
+                  <label class="form-check-label" for="assignLoue">
+                    <i class="fas fa-key me-1 text-primary"></i> Location ({{ assignPropSelected.prixLocation | number:'1.0-0' }} TND/mois)
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <!-- Rental contract (only for LOUE) -->
+            <div *ngIf="assignPropStatus === 'LOUE'" class="card border-primary mb-3">
+              <div class="card-header bg-primary text-white py-2">
+                <i class="fas fa-file-contract me-2"></i>Contrat de location
+              </div>
+              <div class="card-body">
+                <div class="row g-3">
+                  <div class="col-md-4">
+                    <label class="form-label">Date de début *</label>
+                    <input type="date" class="form-control" [(ngModel)]="assignPropRentalStart">
+                  </div>
+                  <div class="col-md-4">
+                    <label class="form-label">Durée (mois) *</label>
+                    <input type="number" class="form-control" [(ngModel)]="assignPropRentalMonths" min="1" placeholder="Ex: 12">
+                  </div>
+                  <div class="col-md-4">
+                    <label class="form-label">Loyer mensuel (TND)</label>
+                    <input type="number" class="form-control" [(ngModel)]="assignPropRentalAmount" min="0">
+                  </div>
+                  <div class="col-md-8">
+                    <label class="form-label">Notes</label>
+                    <input type="text" class="form-control" [(ngModel)]="assignPropRentalNotes" placeholder="Ex: Caution 2 mois">
+                  </div>
+                  <div class="col-md-4 d-flex align-items-end">
+                    <div *ngIf="assignRentalEndPreview" class="text-muted small">
+                      <i class="fas fa-calendar-check text-primary me-1"></i>
+                      Fin prévue : <strong>{{ assignRentalEndPreview }}</strong>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Summary -->
+            <div class="alert alert-success-subtle border border-success rounded py-2 px-3">
+              <i class="fas fa-user me-2 text-success"></i>
+              Assigné à <strong>{{ assignPropClient?.prenom }} {{ assignPropClient?.nom }}</strong>
+              ({{ assignPropClient?.email }})
+            </div>
+          </div>
+        </ng-container>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" (click)="closeAssignPropertyModal()">Annuler</button>
+        <button type="button" class="btn btn-success" *ngIf="assignPropSelected"
+                [disabled]="!assignCanConfirm || assignPropLoading"
+                (click)="confirmAssignProperty()">
+          <span *ngIf="assignPropLoading" class="spinner-border spinner-border-sm me-2"></span>
+          <i *ngIf="!assignPropLoading" class="fas fa-check me-2"></i>
+          Confirmer l'assignation
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Historique -->
+<div class="modal fade" tabindex="-1" #historyModal>
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h4 class="modal-title"><i class="fas fa-history me-2"></i>Historique - {{ selectedClient?.prenom }} {{ selectedClient?.nom }}</h4>
+        <button type="button" class="btn-close" (click)="closeHistoryModal()"></button>
+      </div>
+      <div class="modal-body">
+        <div class="history-list" *ngIf="clientNotes.length > 0; else noNotes">
+          <div class="history-item" *ngFor="let note of clientNotes">
+            <div class="history-icon"><i class="fas fa-sticky-note"></i></div>
+            <div class="history-content">
+              <div class="history-title">Note de {{ note.commercialPrenom }} {{ note.commercialNom }}</div>
+              <div class="history-detail">{{ note.note }}</div>
+              <div class="history-date">{{ formatDate(note.createdAt) }}</div>
+            </div>
+          </div>
+        </div>
+        <ng-template #noNotes>
+          <div class="text-center py-5">
+            <i class="fas fa-comment-slash fa-3x text-muted mb-3"></i>
+            <p class="text-muted">Aucune note pour ce client</p>
+          </div>
+        </ng-template>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" (click)="closeHistoryModal()">Fermer</button>
+        <button type="button" class="btn btn-primary" (click)="closeHistoryModal(); openNoteModal(selectedClient!)">
+          <i class="fas fa-plus me-2"></i>Ajouter une note
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

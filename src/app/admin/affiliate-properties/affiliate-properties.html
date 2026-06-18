@@ -1,0 +1,145 @@
+<div class="page-wrapper">
+  <div class="page-header">
+    <div class="page-header-left">
+      <h2><i class="fas fa-home"></i> Biens Disponibles</h2>
+      <p class="page-subtitle">Biens éligibles à l'affiliation dans vos zones géographiques</p>
+    </div>
+    <div class="page-header-right">
+      <button class="btn btn-outline" (click)="load()"><i class="fas fa-sync-alt"></i> Actualiser</button>
+    </div>
+  </div>
+
+  <div class="alert alert-success" *ngIf="successMessage" (click)="clearMessages()">
+    <i class="fas fa-check-circle"></i> {{ successMessage }}
+  </div>
+  <div class="alert alert-danger" *ngIf="errorMessage" (click)="clearMessages()">
+    <i class="fas fa-exclamation-circle"></i> {{ errorMessage }}
+  </div>
+
+  <!-- Filters -->
+  <div class="filter-bar">
+    <input type="text" placeholder="Rechercher par titre, ville, région…" [(ngModel)]="searchTerm" (input)="applyFilters()" class="form-control" style="max-width:280px">
+    <select [(ngModel)]="typeFilter" (change)="applyFilters()">
+      <option value="">Tous types</option>
+      <option value="APPARTEMENT">Appartement</option>
+      <option value="VILLA">Villa</option>
+      <option value="BUREAU">Bureau</option>
+      <option value="TERRAIN">Terrain</option>
+    </select>
+    <select [(ngModel)]="sortBy" (change)="applyFilters()">
+      <option value="commission">Plus forte commission</option>
+      <option value="price_desc">Prix décroissant</option>
+      <option value="price_asc">Prix croissant</option>
+    </select>
+  </div>
+
+  <div class="loading-state" *ngIf="loading"><i class="fas fa-spinner fa-spin"></i><span>Chargement des biens…</span></div>
+
+  <div class="empty-state" *ngIf="!loading && filtered.length === 0">
+    <i class="fas fa-home fa-3x"></i>
+    <h3>Aucun bien disponible</h3>
+    <p>Aucun bien éligible ne correspond à vos zones actuelles.</p>
+  </div>
+
+  <!-- Count -->
+  <p *ngIf="!loading && filtered.length > 0" style="font-size:0.875rem;color:var(--text-muted);margin-bottom:1rem;">
+    {{ filtered.length }} bien{{ filtered.length > 1 ? 's' : '' }} disponible{{ filtered.length > 1 ? 's' : '' }}
+  </p>
+
+  <!-- Property Grid -->
+  <div class="property-grid" *ngIf="!loading && filtered.length > 0">
+    <div class="property-card" *ngFor="let p of filtered">
+      <div class="property-image">
+        <img *ngIf="getImageUrl(p.mainImageUrl)" [src]="getImageUrl(p.mainImageUrl)" [alt]="p.titre">
+        <div class="no-image" *ngIf="!getImageUrl(p.mainImageUrl)">
+          <i class="fas fa-building"></i>
+          <span>Aucune image</span>
+        </div>
+        <div class="commission-overlay" *ngIf="p.commissionPercentage && !p.reservedByAffiliate">
+          <i class="fas fa-percent"></i> {{ p.commissionPercentage }}%
+        </div>
+        <div class="reserved-overlay" *ngIf="p.reservedByAffiliate">
+          <i class="fas fa-lock"></i> Réservé
+        </div>
+      </div>
+      <div class="property-body">
+        <div class="property-type-tag">{{ p.type }}</div>
+        <h4 class="property-title">{{ p.titre }}</h4>
+        <div class="property-location">
+          <i class="fas fa-map-marker-alt"></i>
+          {{ p.city }}<span *ngIf="p.region">, {{ p.region }}</span>
+        </div>
+        <div class="property-price">{{ formatPrice(p) }}</div>
+        <div class="property-meta">
+          <span *ngIf="p.surface"><i class="fas fa-ruler-combined"></i> {{ p.surface }} m²</span>
+          <span *ngIf="p.nbChambres"><i class="fas fa-bed"></i> {{ p.nbChambres }} ch.</span>
+        </div>
+        <div class="property-actions">
+          <button class="btn btn-primary" style="flex:1" (click)="openOfferModal(p)" [disabled]="p.reservedByAffiliate" [title]="p.reservedByAffiliate ? 'Ce bien est déjà réservé par un affilié' : ''">
+            <i class="fas" [ngClass]="p.reservedByAffiliate ? 'fa-lock' : 'fa-file-signature'"></i>
+            {{ p.reservedByAffiliate ? 'Réservé' : 'Proposer un acheteur' }}
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Submit Offer Modal -->
+<div class="modal-overlay" *ngIf="offerModalOpen" (click)="closeOfferModal()">
+  <div class="modal-box" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3><i class="fas fa-file-signature text-primary"></i> Soumettre une offre</h3>
+      <button class="modal-close" (click)="closeOfferModal()"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="offer-property-preview" *ngIf="offerTarget">
+        <div class="offer-property-info">
+          <strong>{{ offerTarget.titre }}</strong>
+          <span>{{ offerTarget.city }}<span *ngIf="offerTarget.region">, {{ offerTarget.region }}</span></span>
+        </div>
+        <div class="offer-commission">
+          <span class="commission-tag" style="font-size:0.875rem;padding:0.3rem 0.7rem;">
+            Commission: {{ offerTarget.commissionPercentage }}%
+          </span>
+        </div>
+      </div>
+
+      <div class="alert alert-danger" *ngIf="offerError" style="cursor:default;">
+        <i class="fas fa-exclamation-circle"></i> {{ offerError }}
+      </div>
+
+      <div class="offer-form-grid">
+        <div class="form-group">
+          <label>Nom de l'acheteur <span class="required">*</span></label>
+          <input type="text" [(ngModel)]="offerForm.buyerName" class="form-control" placeholder="Prénom Nom">
+        </div>
+        <div class="form-group">
+          <label>Email <span class="required">*</span></label>
+          <input type="email" [(ngModel)]="offerForm.buyerEmail" class="form-control" placeholder="email@exemple.com">
+        </div>
+        <div class="form-group">
+          <label>Téléphone</label>
+          <input type="tel" [(ngModel)]="offerForm.buyerPhone" class="form-control" placeholder="+216 xx xxx xxx">
+        </div>
+        <div class="form-group">
+          <label>Prix proposé (TND) <span class="required">*</span></label>
+          <input type="number" [(ngModel)]="offerForm.offeredPrice" class="form-control" [min]="offerMinPrice" step="1000">
+          <small class="form-hint" *ngIf="offerMinPrice > 0">
+            <i class="fas fa-info-circle"></i> Prix minimum : {{ offerMinPrice.toLocaleString('fr-FR') }} TND (prix du bien)
+          </small>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Message / notes</label>
+        <textarea [(ngModel)]="offerForm.message" rows="3" class="form-control" placeholder="Informations complémentaires…"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" (click)="closeOfferModal()">Annuler</button>
+      <button class="btn btn-primary" (click)="submitOffer()" [disabled]="offerLoading">
+        <i class="fas fa-paper-plane"></i> Soumettre l'offre
+      </button>
+    </div>
+  </div>
+</div>
