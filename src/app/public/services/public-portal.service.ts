@@ -14,15 +14,17 @@ export class PublicPortalService {
   private base = `${apiBaseUrl}/api/properties/public/portal`;
 
   listForSale(filters: PublicSearchFilters = {}): Observable<PublicPropertyCard[]> {
-    return this.http.get<PublicPropertyCard[]>(`${this.base}/vente`, {
-      params: this.toParams(filters),
-    });
+    const params = this.toParams(filters);
+    console.log('[DEBUG PortalService] listForSale — filters reçus :', JSON.stringify(filters));
+    console.log('[DEBUG PortalService] listForSale — paramètres HTTP :', params.toString());
+    return this.http.get<PublicPropertyCard[]>(`${this.base}/vente`, { params });
   }
 
   listForRent(filters: PublicSearchFilters = {}): Observable<PublicPropertyCard[]> {
-    return this.http.get<PublicPropertyCard[]>(`${this.base}/location`, {
-      params: this.toParams(filters),
-    });
+    const params = this.toParams(filters);
+    console.log('[DEBUG PortalService] listForRent — filters reçus :', JSON.stringify(filters));
+    console.log('[DEBUG PortalService] listForRent — paramètres HTTP :', params.toString());
+    return this.http.get<PublicPropertyCard[]>(`${this.base}/location`, { params });
   }
 
   featuredVente(limit = 6): Observable<PublicPropertyCard[]> {
@@ -70,8 +72,12 @@ export class PublicPortalService {
   private toParams(filters: PublicSearchFilters): HttpParams {
     let params = new HttpParams();
     Object.entries(filters || {}).forEach(([key, value]) => {
-      if (value === null || value === undefined || value === '') return;
+      if (value === null || value === undefined || value === '') {
+        console.log('[DEBUG PortalService] toParams — clé ignorée (vide/null) :', key, '=', JSON.stringify(value));
+        return;
+      }
       params = params.set(key, String(value));
+      console.log('[DEBUG PortalService] toParams — ajouté :', key, '=', JSON.stringify(String(value)));
     });
     return params;
   }
