@@ -54,6 +54,20 @@ export class ClientAuthService {
     );
   }
 
+  updateProfile(payload: {
+    prenom: string;
+    nom: string;
+    email: string;
+    telephone?: string;
+  }): Observable<ClientPublicProfile> {
+    return this.http.put<ClientPublicProfile>(`${this.base}/profile`, payload).pipe(
+      tap((profile) => {
+        this.currentUser$.next(profile);
+        this.writeStorage(PROFILE_KEY, JSON.stringify(profile));
+      })
+    );
+  }
+
   me(): Observable<ClientPublicProfile | null> {
     if (!this.getToken()) return of(null);
     return this.http.get<ClientPublicProfile>(`${this.base}/me`).pipe(
